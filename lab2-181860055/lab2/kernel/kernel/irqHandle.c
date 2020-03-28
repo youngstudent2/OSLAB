@@ -87,7 +87,6 @@ void syscallPrint(struct TrapFrame *tf) {
 	asm volatile("movw %0, %%es"::"m"(sel));
 	for (i = 0; i < size; i++) {
 		asm volatile("movb %%es:(%1), %0":"=r"(character):"r"(str+i));
-		// TODO in lab2
 		
 		if(character == '\n' || character == '\r'){
 			displayCol = 0;
