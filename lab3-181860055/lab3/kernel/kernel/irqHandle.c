@@ -78,8 +78,35 @@ void syscallHandle(struct TrapFrame *tf) {
 	}
 }
 
+void switch_proc(){
+	uint32_t tmpStackTop = pcb[current].stackTop;
+	pcb[current].stackTop = pcb[current].prevStackTop;
+	tss.esp0 = (uint32_t)&(pcb[current].stackTop);
+	asm volatile("movl %0, %%esp" ::"m"(tmpStackTop)); // switch kernel stack
+	asm volatile("popl %gs");
+	asm volatile("popl %fs");
+	asm volatile("popl %es");
+	asm volatile("popl %ds");
+	asm volatile("popal");
+	asm volatile("addl $8, %esp");
+	asm volatile("iret");
+	
+}
+
 void timerHandle(struct TrapFrame *tf) {
 	// TODO in lab3
+	for(int i=0;i<MAX_PCB_NUM;++i){
+		if(pcb[i].state == STATE_BLOCKED){
+			if(--pcb[i].sleepTime==0)
+				pcb[i].state = STATE_RUNNABLE;
+		}		
+	}
+
+	if(++pcb[current].timeCount==MAX_TIME_COUNT){
+		switch_proc();
+	}
+
+
 	return;
 }
 
@@ -148,11 +175,9 @@ void syscallFork(struct TrapFrame *tf) {
 
 	//find a dead process
 	struct ProcessTable* new_pcb = NULL;
-	int new_pcb_id = -1;
 	for(int i=0;i<MAX_PCB_NUM;++i){
 		if(pcb[i].state == STATE_DEAD){
 			new_pcb = &pcb[i];
-			new_pcb_id = i;
 			break;
 		}
 	}
@@ -165,12 +190,14 @@ void syscallFork(struct TrapFrame *tf) {
 	memcpy(new_pcb->stack,pcb[current].stack,MAX_STACK_SIZE*sizeof(uint32_t));
 	memcpy(&new_pcb->regs,tf,sizeof(struct TrapFrame));
 	
-
+	new_pcb->stackTop = (uint32_t)&(new_pcb->regs);
+	new_pcb->prevStackTop = (uint32_t)&(new_pcb->stackTop);
 	new_pcb->regs.es = new_pcb->regs.ss = new_pcb->regs.ds = USEL();
 	new_pcb->regs.cs = USEL();	
 	new_pcb->state = STATE_RUNNABLE;
-	new_pcb->timeCount = MAX_TIME_COUNT;
-	new_pcb->pid = 2;
+	new_pcb->timeCount = 0;
+	new_pcb->sleepTime = 0;
+	new_pcb->pid = 2; // TODO why 2?
 	new_pcb->regs.eax = 0; // return success value
 	pcb[current].regs.eax = new_pcb->pid; // return pid for parent process
 
@@ -189,6 +216,7 @@ void syscallSleep(struct TrapFrame *tf) {
 	// TODO in lab3
 	pcb[current].state = STATE_BLOCKED;
 	pcb[current].sleepTime = tf->ecx;
+	pcb[current].timeCount = MAX_TIME_COUNT;
 	asm volatile("int $0x20");
 	return;
 }
