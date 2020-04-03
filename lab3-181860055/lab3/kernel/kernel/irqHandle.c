@@ -165,11 +165,11 @@ void syscallFork(struct TrapFrame *tf) {
 	memcpy(new_pcb->stack,pcb[current].stack,MAX_STACK_SIZE*sizeof(uint32_t));
 	memcpy(&new_pcb->regs,tf,sizeof(struct TrapFrame));
 	
-	
+
 	new_pcb->regs.es = new_pcb->regs.ss = new_pcb->regs.ds = USEL();
 	new_pcb->regs.cs = USEL();	
 	new_pcb->state = STATE_RUNNABLE;
-	new_pcb->timeCount = 10; //TODO why 10?
+	new_pcb->timeCount = MAX_TIME_COUNT;
 	new_pcb->pid = 2;
 	new_pcb->regs.eax = 0; // return success value
 	pcb[current].regs.eax = new_pcb->pid; // return pid for parent process
