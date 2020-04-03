@@ -90,7 +90,7 @@ void switch_proc(){
 	asm volatile("popal");
 	asm volatile("addl $8, %esp");
 	asm volatile("iret");
-	
+
 }
 
 void timerHandle(struct TrapFrame *tf) {
@@ -105,8 +105,6 @@ void timerHandle(struct TrapFrame *tf) {
 	if(++pcb[current].timeCount==MAX_TIME_COUNT){
 		switch_proc();
 	}
-
-
 	return;
 }
 
@@ -173,6 +171,8 @@ void syscallPrint(struct TrapFrame *tf) {
 void syscallFork(struct TrapFrame *tf) {
 	// TODO in lab3
 
+	//TODO make sure how to use gdt and cal new pcb seg
+
 	//find a dead process
 	struct ProcessTable* new_pcb = NULL;
 	for(int i=0;i<MAX_PCB_NUM;++i){
@@ -208,6 +208,9 @@ void syscallFork(struct TrapFrame *tf) {
 
 void syscallExec(struct TrapFrame *tf) {
 	// TODO in lab3
+
+	//TODO read syscallPrintf 
+
 	// hint: ret = loadElf(tmp, (current + 1) * 0x100000, &entry);
 	return;
 }
