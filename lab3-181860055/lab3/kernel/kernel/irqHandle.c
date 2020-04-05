@@ -209,9 +209,16 @@ void syscallFork(struct TrapFrame *tf) {
 void syscallExec(struct TrapFrame *tf) {
 	// TODO in lab3
 
-	//TODO read syscallPrintf 
+	char *filename = (char*)tf->ecx;
+	uint32_t entry;
+	int ret = loadElf(filename, (current + 1) * 0x100000, &entry);
+	if(ret == -1){
+		tf->eax = -1;
+		return;
+	}
+	
 
-	// hint: ret = loadElf(tmp, (current + 1) * 0x100000, &entry);
+
 	return;
 }
 
