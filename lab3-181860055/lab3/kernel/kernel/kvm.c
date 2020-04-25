@@ -70,6 +70,35 @@ void initFS () {
 
 int loadElf(const char *filename, uint32_t physAddr, uint32_t *entry) {
 	// TODO in lab3
+
+	struct ELFHeader *elf = (struct ELFHeader *)physAddr;
+	struct ProgramHeader *phoff = (void*)elf+elf->phoff;
+	int offset;
+
+	Inode inode;
+	int inodeOffset = 0;
+	int ret = readInode(&sBlock, &inode, &inodeOffset, filename);
+
+	if(ret == -1){
+		return -1;
+	}
+
+	for (int i = 0; i < inode.blockCount; i++) {
+		ret = readBlock(&sBlock, &inode, i, (uint8_t *)(elf + i * sBlock.blockSize));
+		if(ret == -1)return -1;
+	}
+
+	for(int i=0;i<elf->phnum;++i){
+		if (phoff->type == 0x1)
+		{
+			offset = phoff->off;
+			memcpy((void *)phoff->vaddr + physAddr, (void *)phoff->off + physAddr, phoff->filesz);
+			memset((void *)phoff->vaddr + phoff->filesz +physAddr, 0, phoff->memsz - phoff->filesz);
+		}
+		phoff = (void *)phoff + elf->phentsize;
+	}
+	
+	*entry = elf->entry;
 	return 0;
 }
 

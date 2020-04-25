@@ -79,6 +79,21 @@ void syscallHandle(struct TrapFrame *tf) {
 }
 
 void switch_proc(){
+	
+
+	int next = -1;
+	for(int i=0;i<MAX_PCB_NUM;++i){
+		if(pcb[i].state == STATE_RUNNABLE){
+			next = i;
+			break;
+		}
+	}
+
+	pcb[next].state = STATE_RUNNING;
+	pcb[current].state = STATE_RUNNABLE;
+	//TODO:save some info?
+	current = next;
+
 	uint32_t tmpStackTop = pcb[current].stackTop;
 	pcb[current].stackTop = pcb[current].prevStackTop;
 	tss.esp0 = (uint32_t)&(pcb[current].stackTop);
@@ -171,13 +186,15 @@ void syscallPrint(struct TrapFrame *tf) {
 void syscallFork(struct TrapFrame *tf) {
 	// TODO in lab3
 
-	//TODO make sure how to use gdt and cal new pcb seg
+	//TODO make sure how to use gdt 
 
 	//find a dead process
 	struct ProcessTable* new_pcb = NULL;
+	int slot = -1;
 	for(int i=0;i<MAX_PCB_NUM;++i){
 		if(pcb[i].state == STATE_DEAD){
 			new_pcb = &pcb[i];
+			slot = i;
 			break;
 		}
 	}
@@ -192,24 +209,31 @@ void syscallFork(struct TrapFrame *tf) {
 	
 	new_pcb->stackTop = (uint32_t)&(new_pcb->regs);
 	new_pcb->prevStackTop = (uint32_t)&(new_pcb->stackTop);
-	new_pcb->regs.es = new_pcb->regs.ss = new_pcb->regs.ds = USEL();
-	new_pcb->regs.cs = USEL();	
+	new_pcb->regs.es = new_pcb->regs.ss = new_pcb->regs.ds = USEL(2+slot*2);
+	new_pcb->regs.gs = new_pcb->regs.fs = new_pcb->regs.es;
+	new_pcb->regs.cs = USEL(1+slot*2);	
 	new_pcb->state = STATE_RUNNABLE;
 	new_pcb->timeCount = 0;
 	new_pcb->sleepTime = 0;
-	new_pcb->pid = 2; // TODO why 2?
+	new_pcb->pid = slot;
 	new_pcb->regs.eax = 0; // return success value
 	pcb[current].regs.eax = new_pcb->pid; // return pid for parent process
-
-
-
 	
 }
 
 void syscallExec(struct TrapFrame *tf) {
 	// TODO in lab3
+	
+	char filename[100];
+	int sel = tf->ds;
+	char *str = (char*)tf->ecx;
+	char character = 0;
+	asm volatile("movw %0, %%es"::"m"(sel));
+	for(int i=0;character!='\0';++i){
+		asm volatile("movb %%es:(%1), %0":"=r"(character):"r"(str + i));
+		filename[i] = character;
+	}
 
-	char *filename = (char*)tf->ecx;
 	uint32_t entry;
 	int ret = loadElf(filename, (current + 1) * 0x100000, &entry);
 	if(ret == -1){
@@ -217,6 +241,7 @@ void syscallExec(struct TrapFrame *tf) {
 		return;
 	}
 	
+	tf->eip = entry;
 
 
 	return;
