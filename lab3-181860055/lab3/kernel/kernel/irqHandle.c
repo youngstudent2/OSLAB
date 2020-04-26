@@ -24,7 +24,7 @@ void GProtectFaultHandle(struct TrapFrame *tf);
 
 void timerHandle(struct TrapFrame *tf);
 void keyboardHandle(struct TrapFrame *tf);
-
+int sign = 0;
 void irqHandle(struct TrapFrame *tf) { // pointer tf = esp
 	/*
 	 * 中断处理程序
@@ -36,14 +36,15 @@ void irqHandle(struct TrapFrame *tf) { // pointer tf = esp
 	pcb[current].prevStackTop = pcb[current].stackTop;
 	pcb[current].stackTop = (uint32_t)tf;
 
+	
 	switch(tf->irq) {
 		case -1:
+			putString("-1-1-1-1\n");
 			break;
 		case 0xd:
 			GProtectFaultHandle(tf); // return
 			break;
 		case 0x20:
-			//putInt(20);
 			timerHandle(tf);         // return or iret
 			break;
 		case 0x21:
@@ -51,11 +52,25 @@ void irqHandle(struct TrapFrame *tf) { // pointer tf = esp
 			break;
 		case 0x80:
 			syscallHandle(tf);       // return
+			if(tf->eax == 2)
+				sign = 1;
 			break;
 		default:assert(0);
 	}
 
 	pcb[current].stackTop = tmpStackTop;
+	if(tf->eax == 2){
+		if(tf->irq==0x80){
+			putString("finished");
+			putInt(current);
+		}
+		else
+		{
+			putInt(tf->irq);
+		}
+		
+	}
+		
 }
 
 void syscallHandle(struct TrapFrame *tf) {
@@ -68,6 +83,7 @@ void syscallHandle(struct TrapFrame *tf) {
 			break; // for SYS_FORK
 		case 2:
 			syscallExec(tf);
+			
 			break; // for SYS_EXEC
 		case 3:
 			syscallSleep(tf);
@@ -81,7 +97,7 @@ void syscallHandle(struct TrapFrame *tf) {
 
 void switch_proc(){
 	
-
+	if(sign)putString("here\n");
 	int next = current;
 	for(int i=MAX_PCB_NUM - 1;i>=0;--i){
 		if(pcb[i].state == STATE_RUNNABLE){
@@ -92,7 +108,7 @@ void switch_proc(){
 	}
 
 	if(next == current){
-		pcb[current].timeCount = MAX_TiME_COUNT;
+		pcb[current].timeCount = MAX_TIME_COUNT;
 		return;
 	}
 
@@ -117,6 +133,13 @@ void switch_proc(){
 
 void timerHandle(struct TrapFrame *tf) {
 	// TODO in lab3
+	if(sign)
+	{
+		putString("here2\n");
+		putInt(pcb[current].timeCount);
+		sign = 0;
+	}
+	
 	for(int i=0;i<MAX_PCB_NUM;++i){
 		if(pcb[i].state == STATE_BLOCKED){
 			if(--pcb[i].sleepTime==0)

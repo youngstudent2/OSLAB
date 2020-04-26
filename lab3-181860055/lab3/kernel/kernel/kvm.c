@@ -106,8 +106,7 @@ int loadElf(const char *filename, uint32_t physAddr, uint32_t *entry) {
 	putString("type:\n");
 	for(int i=0;i<phnum;i++){
 		phs[i].type = ph->type;
-		putInt(i);
-		putInt(ph->type);
+
 		phs[i].vaddr = ph->vaddr;
 		phs[i].memsz = ph->memsz;
 		phs[i].filesz = ph->filesz;
@@ -122,11 +121,6 @@ int loadElf(const char *filename, uint32_t physAddr, uint32_t *entry) {
 			off = phs[i].off;
 			filesz = phs[i].filesz;
 			memsz = phs[i].memsz;
-
-			putInt(vaddr);
-			putInt(off);
-			putInt(filesz);
-			putInt(memsz);
 
 			memcpy((void *)vaddr + physAddr, (void *)off + physAddr, filesz);
 			setBuffer((uint8_t *)vaddr + filesz + physAddr, memsz - filesz, 0);
