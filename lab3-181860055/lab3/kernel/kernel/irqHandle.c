@@ -82,13 +82,18 @@ void syscallHandle(struct TrapFrame *tf) {
 void switch_proc(){
 	
 
-	int next = -1;
-	for(int i=0;i<MAX_PCB_NUM;++i){
+	int next = current;
+	for(int i=MAX_PCB_NUM - 1;i>=0;--i){
 		if(pcb[i].state == STATE_RUNNABLE){
 			next = i;
 			putInt(next);
 			break;
 		}
+	}
+
+	if(next == current){
+		pcb[current].timeCount = MAX_TiME_COUNT;
+		return;
 	}
 
 	pcb[next].state = STATE_RUNNING;
@@ -190,7 +195,7 @@ void syscallPrint(struct TrapFrame *tf) {
 void syscallFork(struct TrapFrame *tf) {
 	// TODO in lab3
 	putString("fork\n");
-	//TODO make sure how to use gdt 
+	
 
 	//find a dead process
 	struct ProcessTable* new_pcb = NULL;
@@ -220,6 +225,9 @@ void syscallFork(struct TrapFrame *tf) {
 	new_pcb->timeCount = MAX_TIME_COUNT;
 	new_pcb->sleepTime = 0;
 	new_pcb->pid = slot;
+	asm volatile("pushfl");
+	asm volatile("popl %0":"=r"(new_pcb->regs.eflags));
+	new_pcb->regs.eflags = new_pcb->regs.eflags | 0x200;
 	putString("fork new process:");
 	putInt(slot);
 	new_pcb->regs.eax = 0; // return success value
@@ -252,8 +260,8 @@ void syscallExec(struct TrapFrame *tf) {
 	}
 	
 	tf->eip = entry;
-	putInt(entry);
-
+	//putInt(entry);
+	//while(1);
 	return;
 }
 
