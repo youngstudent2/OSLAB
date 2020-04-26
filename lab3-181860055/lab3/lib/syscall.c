@@ -233,6 +233,7 @@ int str2Str(char *string, char *buffer, int size, int count) {
 
 pid_t fork() {
 	// TODO in lab3
+	
 	return syscall(SYS_FORK,0,0,0,0,0);
 }
 

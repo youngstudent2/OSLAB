@@ -13,4 +13,5 @@ int stringCpy (const char *srcString, char *destString, int size);
 
 int setBuffer (uint8_t *buffer, int size, uint8_t value);
 
+int memcpy(void * dest, void * src, uint32_t size);
 #endif

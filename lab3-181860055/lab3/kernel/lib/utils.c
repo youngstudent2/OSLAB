@@ -88,6 +88,13 @@ int stringCpy (const char *srcString, char *destString, int size) {
     return 0;
 }
 
+int memcpy(void* dest,void* src,uint32_t size){	
+	for(int i=0;i<size;++i){
+		*((char*)dest+i) = *((char*)src+i);	
+	}
+	return 0;
+}
+
 int setBuffer (uint8_t *buffer, int size, uint8_t value) {
     int i = 0;
     if (buffer == NULL)

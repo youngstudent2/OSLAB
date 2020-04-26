@@ -68,13 +68,21 @@ void initFS () {
 	// putInt(sBlock.blocks);
 }
 
+struct PH
+{
+	uint32_t vaddr;
+	uint32_t off;
+	uint32_t filesz;
+	uint32_t memsz;
+	uint32_t type;
+};
+
+
 int loadElf(const char *filename, uint32_t physAddr, uint32_t *entry) {
 	// TODO in lab3
-
 	struct ELFHeader *elf = (struct ELFHeader *)physAddr;
-	struct ProgramHeader *phoff = (void*)elf+elf->phoff;
-	int offset;
-
+	
+	*entry = elf->entry;
 	Inode inode;
 	int inodeOffset = 0;
 	int ret = readInode(&sBlock, &inode, &inodeOffset, filename);
@@ -87,18 +95,40 @@ int loadElf(const char *filename, uint32_t physAddr, uint32_t *entry) {
 		ret = readBlock(&sBlock, &inode, i, (uint8_t *)(elf + i * sBlock.blockSize));
 		if(ret == -1)return -1;
 	}
+	struct ProgramHeader *ph = (void*)elf+elf->phoff;
+	int phnum = elf->phnum;
+	uint32_t vaddr = ph->vaddr;
+	uint32_t off = ph->off;
+	uint32_t filesz = ph->filesz;
+	uint32_t memsz = ph->memsz;
+	//struct PH *phs = (struct PH *)malloc(sizeof(struct PH)*phnum);
+	struct PH phs[50];
+	for(int i=0;i<phnum;i++){
+		phs[i].type = ph->type;
+		phs[i].vaddr = ph->vaddr;
+		phs[i].memsz = ph->memsz;
+		phs[i].filesz = ph->filesz;
+		phs[i].off = ph->off;
+		ph = (void*)ph + elf->phentsize;
+	}
 
-	for(int i=0;i<elf->phnum;++i){
-		if (phoff->type == 0x1)
+	for(int i=0;i<phnum;++i){
+		if (phs[i].type == 0x1)
 		{
-			offset = phoff->off;
-			memcpy((void *)phoff->vaddr + physAddr, (void *)phoff->off + physAddr, phoff->filesz);
-			memset((void *)phoff->vaddr + phoff->filesz +physAddr, 0, phoff->memsz - phoff->filesz);
+			vaddr = phs[i].vaddr;
+			off = phs[i].off;
+			filesz = phs[i].filesz;
+			memsz = phs[i].memsz;
+
+			memcpy((void *)vaddr + physAddr, (void *)off + physAddr, filesz);
+			setBuffer((uint8_t *)vaddr + filesz + physAddr, memsz - filesz, 0);
 		}
-		phoff = (void *)phoff + elf->phentsize;
 	}
 	
-	*entry = elf->entry;
+	
+	putString("entry:");
+	putInt(*entry);
+	
 	return 0;
 }
 

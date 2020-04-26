@@ -31,7 +31,7 @@ void irqHandle(struct TrapFrame *tf) { // pointer tf = esp
 	 */
 	/* Reassign segment register */
 	asm volatile("movw %%ax, %%ds"::"a"(KSEL(SEG_KDATA)));
-
+	
 	uint32_t tmpStackTop = pcb[current].stackTop;
 	pcb[current].prevStackTop = pcb[current].stackTop;
 	pcb[current].stackTop = (uint32_t)tf;
@@ -43,6 +43,7 @@ void irqHandle(struct TrapFrame *tf) { // pointer tf = esp
 			GProtectFaultHandle(tf); // return
 			break;
 		case 0x20:
+			//putInt(20);
 			timerHandle(tf);         // return or iret
 			break;
 		case 0x21:
@@ -85,6 +86,7 @@ void switch_proc(){
 	for(int i=0;i<MAX_PCB_NUM;++i){
 		if(pcb[i].state == STATE_RUNNABLE){
 			next = i;
+			putInt(next);
 			break;
 		}
 	}
@@ -105,7 +107,7 @@ void switch_proc(){
 	asm volatile("popal");
 	asm volatile("addl $8, %esp");
 	asm volatile("iret");
-
+	
 }
 
 void timerHandle(struct TrapFrame *tf) {
@@ -116,9 +118,11 @@ void timerHandle(struct TrapFrame *tf) {
 				pcb[i].state = STATE_RUNNABLE;
 		}		
 	}
-
-	if(++pcb[current].timeCount==MAX_TIME_COUNT){
+	if(--pcb[current].timeCount==0){
+		putString("switch:");
+		putInt(current);
 		switch_proc();
+		putInt(current);
 	}
 	return;
 }
@@ -185,7 +189,7 @@ void syscallPrint(struct TrapFrame *tf) {
 
 void syscallFork(struct TrapFrame *tf) {
 	// TODO in lab3
-
+	putString("fork\n");
 	//TODO make sure how to use gdt 
 
 	//find a dead process
@@ -204,7 +208,7 @@ void syscallFork(struct TrapFrame *tf) {
 	}
 		
 	//拷贝父进程内容到子进程中
-	memcpy(new_pcb->stack,pcb[current].stack,MAX_STACK_SIZE*sizeof(uint32_t));
+	memcpy((void*)new_pcb->stack,(void*)pcb[current].stack,MAX_STACK_SIZE*sizeof(uint32_t));
 	memcpy(&new_pcb->regs,tf,sizeof(struct TrapFrame));
 	
 	new_pcb->stackTop = (uint32_t)&(new_pcb->regs);
@@ -213,9 +217,11 @@ void syscallFork(struct TrapFrame *tf) {
 	new_pcb->regs.gs = new_pcb->regs.fs = new_pcb->regs.es;
 	new_pcb->regs.cs = USEL(1+slot*2);	
 	new_pcb->state = STATE_RUNNABLE;
-	new_pcb->timeCount = 0;
+	new_pcb->timeCount = MAX_TIME_COUNT;
 	new_pcb->sleepTime = 0;
 	new_pcb->pid = slot;
+	putString("fork new process:");
+	putInt(slot);
 	new_pcb->regs.eax = 0; // return success value
 	pcb[current].regs.eax = new_pcb->pid; // return pid for parent process
 	
@@ -223,32 +229,37 @@ void syscallFork(struct TrapFrame *tf) {
 
 void syscallExec(struct TrapFrame *tf) {
 	// TODO in lab3
-	
+	putString("exec\n");
+	//putInt(tf->eip);
 	char filename[100];
 	int sel = tf->ds;
 	char *str = (char*)tf->ecx;
-	char character = 0;
+	char character = 1;
 	asm volatile("movw %0, %%es"::"m"(sel));
 	for(int i=0;character!='\0';++i){
 		asm volatile("movb %%es:(%1), %0":"=r"(character):"r"(str + i));
+		//putChar(character);
 		filename[i] = character;
 	}
-
+	
+	putString(filename);
 	uint32_t entry;
 	int ret = loadElf(filename, (current + 1) * 0x100000, &entry);
 	if(ret == -1){
 		tf->eax = -1;
+		putString("load elf failed!\n");
 		return;
 	}
 	
 	tf->eip = entry;
-
+	putInt(entry);
 
 	return;
 }
 
 void syscallSleep(struct TrapFrame *tf) {
 	// TODO in lab3
+	putString("sleep\n");
 	pcb[current].state = STATE_BLOCKED;
 	pcb[current].sleepTime = tf->ecx;
 	pcb[current].timeCount = MAX_TIME_COUNT;
@@ -258,6 +269,7 @@ void syscallSleep(struct TrapFrame *tf) {
 
 void syscallExit(struct TrapFrame *tf) {
 	// TODO in lab3
+	putString("exit");
 	pcb[current].state = STATE_DEAD;
 	asm volatile("int $0x20");
 	return;
