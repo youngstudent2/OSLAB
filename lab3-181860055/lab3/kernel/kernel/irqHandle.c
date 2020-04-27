@@ -38,7 +38,6 @@ void irqHandle(struct TrapFrame *tf) { // pointer tf = esp
 	
 	switch(tf->irq) {
 		case -1:
-			putString("-1-1-1-1\n");
 			break;
 		case 0xd:
 			GProtectFaultHandle(tf); // return
@@ -93,8 +92,6 @@ void switch_proc(){
 		}
 	}
 
-	
-
 	pcb[next].state = STATE_RUNNING;
 	if(pcb[current].state == STATE_RUNNING)
 		pcb[current].state = STATE_RUNNABLE;
@@ -117,8 +114,6 @@ void switch_proc(){
 
 void timerHandle(struct TrapFrame *tf) {
 	// TODO in lab3
-	//putString("current:");
-	//putInt(current);
 	
 	for(int i=1;i<MAX_PCB_NUM;++i){
 		if(pcb[i].state == STATE_BLOCKED){
@@ -130,11 +125,8 @@ void timerHandle(struct TrapFrame *tf) {
 			
 		}	
 	}
-	//putInt(pcb[current].timeCount);
-	//judge current dead
 	if(++pcb[current].timeCount>=MAX_TIME_COUNT){		
 		switch_proc();  //进程切换
-
 	}
 	return;
 }
@@ -217,12 +209,18 @@ void syscallFork(struct TrapFrame *tf) {
 		pcb[current].regs.eax = -1; //fork fail
 		return;
 	}
-		
+	int count = 0;
 	//拷贝父进程内容到子进程中
-	
+	enableInterrupt();
 	for(int i=0;i<0x100000;++i){
 		*(uint8_t*)(i+(slot+1)*0x100000) = *(uint8_t*)(i+(current+1)*0x100000);
+		if(++count>1000){
+			count = 0;
+			asm volatile("int $0x20");
+		}
+		
 	}
+	disableInterrupt();
 	uint32_t delta = (uint32_t)new_pcb-(uint32_t)&pcb[current];
 	new_pcb->stackTop = pcb[current].stackTop+delta;
 	new_pcb->prevStackTop = pcb[current].prevStackTop+delta;
@@ -243,21 +241,17 @@ void syscallFork(struct TrapFrame *tf) {
 	new_pcb->regs.esi = pcb[current].regs.esi;
 	new_pcb->regs.edi = pcb[current].regs.edi;
 
-/*
-	asm volatile("pushfl");
-	asm volatile("popl %0":"=r"(new_pcb->regs.eflags));
-	new_pcb->regs.eflags = new_pcb->regs.eflags | 0x200;*/
-	putString("fork new process:");
-	putInt(slot);
-	new_pcb->regs.eax = 0; // return success value
-	pcb[current].regs.eax = new_pcb->pid; // return pid for parent process
+	putString("fork new process:");putInt(slot);
+	// return success value and return pid for parent process
+	new_pcb->regs.eax = 0; 
+	pcb[current].regs.eax = new_pcb->pid;
 	return;
 }
 
 void syscallExec(struct TrapFrame *tf) {
 	// TODO in lab3
 	putString("exec\n");
-	//putInt(tf->eip);
+
 	char filename[100];
 	int sel = tf->ds;
 	char *str = (char*)tf->ecx;
@@ -278,10 +272,7 @@ void syscallExec(struct TrapFrame *tf) {
 		return;
 	}
 	
-	//tf->eip = entry;
-	pcb[current].regs.eip = entry;
-	timerHandle(tf);
-	//while(1);
+	tf->eip = entry;
 	return;
 }
 
@@ -291,6 +282,7 @@ void syscallSleep(struct TrapFrame *tf) {
 	pcb[current].state = STATE_BLOCKED;
 	pcb[current].sleepTime = tf->ecx;
 	pcb[current].timeCount = MAX_TIME_COUNT;
+	asm volatile("int $0x20");
 	timerHandle(tf);
 	return;
 }
@@ -300,6 +292,7 @@ void syscallExit(struct TrapFrame *tf) {
 	putString("exit\n");
 	pcb[current].state = STATE_DEAD;
 	pcb[current].timeCount = MAX_TIME_COUNT;
+	asm volatile("int $0x20");
 	timerHandle(tf);
 	return;
 }

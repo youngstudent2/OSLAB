@@ -68,71 +68,34 @@ void initFS () {
 	// putInt(sBlock.blocks);
 }
 
-struct PH
-{
-	uint32_t vaddr;
-	uint32_t off;
-	uint32_t filesz;
-	uint32_t memsz;
-	uint32_t type;
-};
+int loadElf(const char *filename, uint32_t physAddr, uint32_t *entry)
+{ 
 
-/*
-int loadElf(const char *filename, uint32_t physAddr, uint32_t *entry) {
-	// TODO in lab3
-	struct ELFHeader *elf = (struct ELFHeader *)physAddr;
-	
-	*entry = elf->entry;
-	Inode inode;
+	int i = 0;
+	int phoff = 0x34;	 // program header offset
+	int offset = 0x1000; // .text section offset    
+	uint32_t elf = physAddr; // physical memory addr to load    
+	Inode inode;    
 	int inodeOffset = 0;
 	int ret = readInode(&sBlock, &inode, &inodeOffset, filename);
-
-	if(ret == -1){
+	if(ret == -1)	
 		return -1;
+	for (i = 0; i < inode.blockCount; i++)
+	{
+		ret = readBlock(&sBlock, &inode, i, 
+			(uint8_t *)(elf + i * sBlock.blockSize));
+		if(ret == -1)	
+			return -1;
+	} // entry address of the program
+	*entry = ((struct ELFHeader *)elf)->entry;
+	phoff = ((struct ELFHeader *)elf)->phoff;
+	offset = ((struct ProgramHeader *)(elf + phoff))->off;
+	for (i = 0; i < 200 * 512; i++)
+	{
+		*(uint8_t *)(elf + i) = *(uint8_t *)(elf + i + offset);
 	}
-
-	for (int i = 0; i < inode.blockCount; i++) {
-		ret = readBlock(&sBlock, &inode, i, (uint8_t *)(elf + i * sBlock.blockSize));
-		if(ret == -1)return -1;
-	}
-	struct ProgramHeader *ph = (void*)elf+elf->phoff;
-	int phnum = elf->phnum;
-	uint32_t vaddr = ph->vaddr;
-	uint32_t off = ph->off;
-	uint32_t filesz = ph->filesz;
-	uint32_t memsz = ph->memsz;
-	//struct PH *phs = (struct PH *)malloc(sizeof(struct PH)*phnum);
-	struct PH phs[50];
-	putString("type:\n");
-	for(int i=0;i<phnum;i++){
-		phs[i].type = ph->type;
-
-		phs[i].vaddr = ph->vaddr;
-		phs[i].memsz = ph->memsz;
-		phs[i].filesz = ph->filesz;
-		phs[i].off = ph->off;
-		ph = (void*)ph + elf->phentsize;
-	}
-
-	for(int i=0;i<phnum;++i){
-		if (phs[i].type == 0x1)
-		{
-			vaddr = phs[i].vaddr;
-			off = phs[i].off;
-			filesz = phs[i].filesz;
-			memsz = phs[i].memsz;
-
-			memcpy((void *)vaddr + physAddr, (void *)off + physAddr, filesz);
-			setBuffer((uint8_t *)vaddr + filesz + physAddr, memsz - filesz, 0);
-		}
-	}
-	
-	
-	putString("entry:");
-	putInt(*entry);
-	
 	return 0;
-}*/
+}
 
 /*
 kernel is loaded to location 0x100000, i.e., 1MB
@@ -208,28 +171,3 @@ void initProc() {
 	}
 }
 
-int loadElf(const char *filename, uint32_t physAddr, uint32_t *entry)
-{ // TODO in lab3
-
-	int i = 0;
-	int phoff = 0x34;	 // program header offset
-	int offset = 0x1000; // .text section offset    
-	uint32_t elf = physAddr; // physical memory addr to load    
-	Inode inode;    
-	int inodeOffset = 0;
-	if (readInode(&sBlock, &inode, &inodeOffset, filename) == -1)
-		return -1;
-	for (i = 0; i < inode.blockCount; i++)
-	{
-		if (readBlock(&sBlock, &inode, i, (uint8_t *)(elf + i * sBlock.blockSize)) == -1)
-			return -1;
-	} // entry address of the program
-	*entry = ((struct ELFHeader *)elf)->entry;
-	phoff = ((struct ELFHeader *)elf)->phoff;
-	offset = ((struct ProgramHeader *)(elf + phoff))->off;
-	for (i = 0; i < 200 * 512; i++)
-	{
-		*(uint8_t *)(elf + i) = *(uint8_t *)(elf + i + offset);
-	}
-	return 0;
-}
