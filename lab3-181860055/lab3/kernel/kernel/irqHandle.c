@@ -24,7 +24,6 @@ void GProtectFaultHandle(struct TrapFrame *tf);
 
 void timerHandle(struct TrapFrame *tf);
 void keyboardHandle(struct TrapFrame *tf);
-int sign = 0;
 void irqHandle(struct TrapFrame *tf) { // pointer tf = esp
 	/*
 	 * 中断处理程序
@@ -52,24 +51,12 @@ void irqHandle(struct TrapFrame *tf) { // pointer tf = esp
 			break;
 		case 0x80:
 			syscallHandle(tf);       // return
-			if(tf->eax == 2)
-				sign = 1;
 			break;
 		default:assert(0);
 	}
 
 	pcb[current].stackTop = tmpStackTop;
-	if(tf->eax == 2){
-		if(tf->irq==0x80){
-			putString("finished");
-			putInt(current);
-		}
-		else
-		{
-			putInt(tf->irq);
-		}
-		
-	}
+	
 		
 }
 
@@ -97,24 +84,21 @@ void syscallHandle(struct TrapFrame *tf) {
 
 void switch_proc(){
 	
-	if(sign)putString("here\n");
-	int next = current;
+
+	int next = 0;
 	for(int i=MAX_PCB_NUM - 1;i>=0;--i){
 		if(pcb[i].state == STATE_RUNNABLE){
 			next = i;
-			putInt(next);
 			break;
 		}
 	}
 
-	if(next == current){
-		pcb[current].timeCount = MAX_TIME_COUNT;
-		return;
-	}
+	
 
 	pcb[next].state = STATE_RUNNING;
-	pcb[current].state = STATE_RUNNABLE;
-	//TODO:save some info?
+	if(pcb[current].state == STATE_RUNNING)
+		pcb[current].state = STATE_RUNNABLE;
+	pcb[current].timeCount = 0;
 	current = next;
 
 	uint32_t tmpStackTop = pcb[current].stackTop;
@@ -133,24 +117,24 @@ void switch_proc(){
 
 void timerHandle(struct TrapFrame *tf) {
 	// TODO in lab3
-	if(sign)
-	{
-		putString("here2\n");
-		putInt(pcb[current].timeCount);
-		sign = 0;
-	}
+	//putString("current:");
+	//putInt(current);
 	
-	for(int i=0;i<MAX_PCB_NUM;++i){
+	for(int i=1;i<MAX_PCB_NUM;++i){
 		if(pcb[i].state == STATE_BLOCKED){
-			if(--pcb[i].sleepTime==0)
+			--pcb[i].sleepTime;
+			if(pcb[i].sleepTime<=0){
 				pcb[i].state = STATE_RUNNABLE;
-		}		
+			}
+				
+			
+		}	
 	}
-	if(--pcb[current].timeCount==0){
-		putString("switch:");
-		putInt(current);
-		switch_proc();
-		putInt(current);
+	//putInt(pcb[current].timeCount);
+	//judge current dead
+	if(++pcb[current].timeCount>=MAX_TIME_COUNT){		
+		switch_proc();  //进程切换
+
 	}
 	return;
 }
@@ -218,7 +202,6 @@ void syscallPrint(struct TrapFrame *tf) {
 void syscallFork(struct TrapFrame *tf) {
 	// TODO in lab3
 	putString("fork\n");
-	
 
 	//find a dead process
 	struct ProcessTable* new_pcb = NULL;
@@ -236,16 +219,17 @@ void syscallFork(struct TrapFrame *tf) {
 	}
 		
 	//拷贝父进程内容到子进程中
-	memcpy((void*)new_pcb->stack,(void*)pcb[current].stack,MAX_STACK_SIZE*sizeof(uint32_t));
-	memcpy(&new_pcb->regs,tf,sizeof(struct TrapFrame));
+	
+	for(int i=0;i<0x100000;++i){
+		*(uint8_t*)(i+(slot+1)*0x100000) = *(uint8_t*)(i+(current+1)*0x100000);
+	}
 	uint32_t delta = (uint32_t)new_pcb-(uint32_t)&pcb[current];
 	new_pcb->stackTop = pcb[current].stackTop+delta;
 	new_pcb->prevStackTop = pcb[current].prevStackTop+delta;
-	new_pcb->regs.es = new_pcb->regs.ss = new_pcb->regs.ds = USEL(2+slot*2);
-	new_pcb->regs.gs = new_pcb->regs.fs = new_pcb->regs.es;
+	new_pcb->regs.gs = new_pcb->regs.fs = new_pcb->regs.es = new_pcb->regs.ss = new_pcb->regs.ds = USEL(2+slot*2);
 	new_pcb->regs.cs = USEL(1+slot*2);	
 	new_pcb->state = STATE_RUNNABLE;
-	new_pcb->timeCount = MAX_TIME_COUNT;
+	new_pcb->timeCount = 0;
 	new_pcb->sleepTime = 0;
 	new_pcb->pid = slot;
 
@@ -267,7 +251,7 @@ void syscallFork(struct TrapFrame *tf) {
 	putInt(slot);
 	new_pcb->regs.eax = 0; // return success value
 	pcb[current].regs.eax = new_pcb->pid; // return pid for parent process
-	
+	return;
 }
 
 void syscallExec(struct TrapFrame *tf) {
@@ -297,7 +281,7 @@ void syscallExec(struct TrapFrame *tf) {
 	//tf->eip = entry;
 	pcb[current].regs.eip = entry;
 	timerHandle(tf);
-	
+	//while(1);
 	return;
 }
 
@@ -313,8 +297,9 @@ void syscallSleep(struct TrapFrame *tf) {
 
 void syscallExit(struct TrapFrame *tf) {
 	// TODO in lab3
-	putString("exit");
+	putString("exit\n");
 	pcb[current].state = STATE_DEAD;
+	pcb[current].timeCount = MAX_TIME_COUNT;
 	timerHandle(tf);
 	return;
 }
