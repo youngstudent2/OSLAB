@@ -246,13 +246,16 @@ int scanf(const char *format,...) {
 	int avail=0; // string size
 	int ret=0;
 	buffer[0]=0;
+	//printf("%s\n",format);
 	while(format[i]!=0){
 		if(buffer[count]==0){
 			do{
-				ret=syscall(SYS_READ, STD_IN, (uint32_t)buffer, (uint32_t)MAX_BUFFER_SIZE, 0, 0);
+				ret=syscall(SYS_READ, STD_IN, (uint32_t)buffer, (uint32_t)MAX_BUFFER_SIZE, 0, 0);								
 			}while(ret == 0 || ret == -1);
 			count=0;
+			//printf("ret:%d %s\n",ret,buffer);
 		}
+		//printf("current state:%d\n",state);
 		switch(state){
 			case 0:
 				switch(format[i]){
@@ -302,6 +305,7 @@ int scanf(const char *format,...) {
 						else
 							break;
 					case 'c':
+						//printf("phase C!!\n");
 						state = 0;
 						index+=4;
 						*(*(char**)(paraList+index))=buffer[count];

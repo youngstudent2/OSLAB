@@ -180,10 +180,22 @@ void keyboardHandle(struct TrapFrame *tf) {
 	if (keyCode == 0)
 		return;
 	putChar(getChar(keyCode));
+	//putInt(keyCode);
 	keyBuffer[bufferTail] = keyCode;
 	bufferTail = (bufferTail + 1) % MAX_KEYBUFFER_SIZE;
 	
+	
+	// wake up dev[STD_IN]
 
+	if(dev[STD_IN].value < 0){
+		ProcessTable* pt = (ProcessTable*)((uint32_t)(dev[STD_IN].pcb.prev)-
+							(uint32_t)&(((ProcessTable*)0)->blocked));
+		dev[STD_IN].pcb.prev = (dev[STD_IN].pcb.prev)->prev;
+		(dev[STD_IN].pcb.prev)->next = &(dev[STD_IN].pcb);
+		pt->state = STATE_RUNNABLE;
+		dev[STD_IN].value = 0;
+	}
+	
 
 	return;
 }
@@ -247,6 +259,18 @@ void syscallWriteStdOut(struct TrapFrame *tf) {
 
 void syscallWriteShMem(struct TrapFrame *tf) {
 	// TODO in lab4
+	int size = tf->edx;
+	int sel = tf->ds;
+	int index = tf->ebx;
+	//int fd = tf->eax;
+	char *str = (char*)tf->ecx;
+	char character = 0;
+
+	asm volatile("movw %0, %%es"::"m"(sel));
+	for(int i=0;i<size;++i){
+		asm volatile("movb %%es:(%0), %1"::"r"(str+i),"r"(character));
+		*(shMem+index+i) = character;
+	}
 	return;
 }
 
@@ -269,11 +293,65 @@ void syscallRead(struct TrapFrame *tf) {
 
 void syscallReadStdIn(struct TrapFrame *tf) {
 	// TODO in lab4
+	if(dev[STD_IN].value == 0){
+		pcb[current].blocked.next = dev[STD_IN].pcb.next;
+		pcb[current].blocked.prev = &(dev[STD_IN].pcb);
+		dev[STD_IN].pcb.next = &(pcb[current].blocked);
+		(pcb[current].blocked.next)->prev = &(pcb[current].blocked);
+		pcb[current].state = STATE_BLOCKED;
+		pcb[current].sleepTime = 0xFFFFFFF;
+		dev[STD_IN].value = -1;
+		
+		putString("block ");
+		putInt(current);
+	}
+	else if(dev[STD_IN].value < 0){
+		tf->eax = -1;
+		return;
+	}
+	//putString("value is:");
+	//putString(dev[STD_IN].value==-1?"-1\n":"0\n");
+	asm volatile("int $0x20");
+	//putString("done value is:");
+	//putString(dev[STD_IN].value==-1?"-1\n":"0\n");
+	int sel = tf->ds;
+	char *str = (char*)tf->edx;
+	int i = 0;
+	char character = 0;
+	int count = 0;
+	int size = (bufferTail + MAX_KEYBUFFER_SIZE - bufferHead) % MAX_KEYBUFFER_SIZE;
+	asm volatile("movw %0, %%es"::"m"(sel));
+	for(;i<size;++i){
+		character = getChar(keyBuffer[bufferHead+i]);
+		if(character>0){
+			asm volatile("movb %0, %%es:(%1)"::"r"(character),"r"(str+count));
+			++count;
+		}
+		
+	}
+	character = 0;
+	asm volatile("movb %0, %%es:(%1)"::"r"(character),"r"(str+count));
+	bufferTail = bufferHead;
+	tf->eax = count;
 	return;
 }
 
 void syscallReadShMem(struct TrapFrame *tf) {
 	// TODO in lab4
+	int size = tf->edx;
+	int sel = tf->ds;
+	int index = tf->ebx;
+	//int fd = tf->eax;
+	char *str = (char*)tf->ecx;
+	char character = 0;
+	asm volatile("movw %0, %%es"::"m"(sel));
+	for(int i=0;i<size;++i){
+		character = *(shMem+index+i);
+		
+		asm volatile("movb %0, %%es:(%1)"::"r"(character),"r"(str+i));
+	}
+
+
 	return;
 }
 
