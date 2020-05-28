@@ -259,16 +259,19 @@ void syscallWriteStdOut(struct TrapFrame *tf) {
 
 void syscallWriteShMem(struct TrapFrame *tf) {
 	// TODO in lab4
-	int size = tf->edx;
+	
+	int size = tf->ebx;
 	int sel = tf->ds;
-	int index = tf->ebx;
-	//int fd = tf->eax;
-	char *str = (char*)tf->ecx;
+	int index = tf->esi;
+	//int fd = tf->ecx;
+	char *str = (char*)tf->edx;
 	char character = 0;
-
+	putInt(size);
+	putInt(index);
 	asm volatile("movw %0, %%es"::"m"(sel));
 	for(int i=0;i<size;++i){
-		asm volatile("movb %%es:(%0), %1"::"r"(str+i),"r"(character));
+		asm volatile("movb %%es:(%1), %0":"=r"(character):"r"(str + i));
+		//putChar(character);
 		*(shMem+index+i) = character;
 	}
 	return;
@@ -302,8 +305,6 @@ void syscallReadStdIn(struct TrapFrame *tf) {
 		pcb[current].sleepTime = 0xFFFFFFF;
 		dev[STD_IN].value = -1;
 		
-		putString("block ");
-		putInt(current);
 	}
 	else if(dev[STD_IN].value < 0){
 		tf->eax = -1;
@@ -338,16 +339,20 @@ void syscallReadStdIn(struct TrapFrame *tf) {
 
 void syscallReadShMem(struct TrapFrame *tf) {
 	// TODO in lab4
-	int size = tf->edx;
+	//putString("sys read now \n");
+	int size = tf->ebx;
 	int sel = tf->ds;
-	int index = tf->ebx;
-	//int fd = tf->eax;
-	char *str = (char*)tf->ecx;
+	int index = tf->esi;
+	//int fd = tf->ecx;
+	char *str = (char*)tf->edx;
 	char character = 0;
+	putInt(size);
+	putInt(index);
+	
 	asm volatile("movw %0, %%es"::"m"(sel));
 	for(int i=0;i<size;++i){
 		character = *(shMem+index+i);
-		
+		//putChar(character);
 		asm volatile("movb %0, %%es:(%1)"::"r"(character),"r"(str+i));
 	}
 
@@ -433,6 +438,8 @@ void syscallExec(struct TrapFrame *tf) {
 }
 
 void syscallSleep(struct TrapFrame *tf) {
+	putString("sleep ");putInt(current);
+	putString("sleepTime ");putInt(tf->ecx);
 	if (tf->ecx == 0) {
 		return;
 	}
@@ -471,21 +478,80 @@ void syscallSem(struct TrapFrame *tf) {
 
 void syscallSemInit(struct TrapFrame *tf) {
 	// TODO in lab4
+	uint32_t value = tf->edx;
+	Semaphore* p = NULL;
+	for(int i=0;i<MAX_SEM_NUM;i++){
+		if(sem[i].state == 0){
+			p = &sem[i];
+		}
+	}
+	if(p){
+		p->value = value;
+		p->state = 1;
+		tf->eax = (uint32_t)p;
+	}
+	else{
+		tf->eax = -1;
+	}
 	return;
 }
 
 void syscallSemWait(struct TrapFrame *tf) {
 	// TODO in lab4
+	Semaphore* p = (Semaphore*)tf->edx;
+	p->value--;putString("wait value ");putInt(p->value);
+	if(p->value<0){
+		putString("block ");putInt(current);
+		
+		pcb[current].blocked.next = p->pcb.next;
+		pcb[current].blocked.prev = &(p->pcb);
+		p->pcb.next = &(pcb[current].blocked);
+		(pcb[current].blocked.next)->prev = &(pcb[current].blocked);
+		pcb[current].state = STATE_BLOCKED;
+		pcb[current].sleepTime = 0xFFFFFFF;
+		tf->eax = 0;
+		asm volatile("int $0x20");
+	}
+	else{
+		tf->eax = -1;
+	}
 	return;
 }
 
 void syscallSemPost(struct TrapFrame *tf) {
 	// TODO in lab4
+	Semaphore* p = (Semaphore*)tf->edx;
+	p->value++;putString("post value ");putInt(p->value);
+	if(p->value<=0){
+
+		ProcessTable* pt = (ProcessTable *)((uint32_t)(p->pcb.prev) - (uint32_t) & (((ProcessTable *)0)->blocked));
+		p->pcb.prev = (p->pcb.prev)->prev;
+		(p->pcb.prev)->next = &(p->pcb);
+		pt->state = STATE_RUNNABLE;
+		putString("release ");putInt(pt->pid);
+		tf->eax = 0;
+	}
+	else{
+		tf->eax = -1;
+	}
 	return;
 }
 
 void syscallSemDestroy(struct TrapFrame *tf) {
 	// TODO in lab4
+	putString("destroy! ");putInt(current);
+	Semaphore* p = (Semaphore*)tf->edx;
+	if(p->value<0){
+		putString("fail!\n");
+		tf->eax = -1;
+		return;
+	}
+	p->value = 0;
+	p->state = 0;
+	p->pcb.next = &(p->pcb);
+	p->pcb.prev = &(p->pcb);
+	putString("pass!\n");
+	tf->eax = 0;
 	return;
 }
 
