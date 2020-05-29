@@ -1,6 +1,6 @@
 #include "lib.h"
 #include "types.h"
-/*
+
 void scanf_test(){
 	int dec = 0;
 	int hex = 0;
@@ -45,7 +45,7 @@ void shMem_test(){
 		}
 		exit();
 	}
-}*/
+}
 void sem_test(){
 	int i = 4;
 	int ret = 0;
@@ -88,10 +88,8 @@ void sem_test(){
 	}
 }
 int uEntry(void) {
-	printf("start\n");
-	sem_test();
 
-/*
+
 	char ch;	
 	printf("Input: 1 for bounded_buffer\n       2 for philosopher\n       3 for reader_writer\n");
 	scanf("%c",&ch);
@@ -109,7 +107,7 @@ int uEntry(void) {
 		default:
 			break;
 	}
-	*/
+	
 	exit();
 	return 0;
 }

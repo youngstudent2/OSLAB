@@ -49,4 +49,13 @@ int sem_destroy(sem_t *sem);
 
 int getpid();
 
+// add rand method
+int index;
+int MT[624]; 
+
+void srand(int seed);
+void generate();
+int rand();
+
+
 #endif
