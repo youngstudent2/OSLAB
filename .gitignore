@@ -1,2 +1,5 @@
 *.rar
 *.zip
+*.o
+*.elf
+genFS
