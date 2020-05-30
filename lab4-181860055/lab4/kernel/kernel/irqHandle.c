@@ -179,7 +179,7 @@ void keyboardHandle(struct TrapFrame *tf) {
 	uint32_t keyCode = getKeyCode();
 	if (keyCode == 0)
 		return;
-	putChar(getChar(keyCode));
+	//putChar(getChar(keyCode));
 	//putInt(keyCode);
 	keyBuffer[bufferTail] = keyCode;
 	bufferTail = (bufferTail + 1) % MAX_KEYBUFFER_SIZE;
@@ -310,11 +310,9 @@ void syscallReadStdIn(struct TrapFrame *tf) {
 		tf->eax = -1;
 		return;
 	}
-	//putString("value is:");
-	//putString(dev[STD_IN].value==-1?"-1\n":"0\n");
+
 	asm volatile("int $0x20");
-	//putString("done value is:");
-	//putString(dev[STD_IN].value==-1?"-1\n":"0\n");
+
 	int sel = tf->ds;
 	char *str = (char*)tf->edx;
 	int i = 0;
@@ -324,7 +322,9 @@ void syscallReadStdIn(struct TrapFrame *tf) {
 	asm volatile("movw %0, %%es"::"m"(sel));
 	for(;i<size;++i){
 		character = getChar(keyBuffer[bufferHead+i]);
+		
 		if(character>0){
+			putChar(character);
 			asm volatile("movb %0, %%es:(%1)"::"r"(character),"r"(str+count));
 			++count;
 		}

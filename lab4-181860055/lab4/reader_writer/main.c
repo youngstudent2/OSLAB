@@ -4,12 +4,12 @@
 #define sleepTime rand()%MAX_SLEEP_TIME
 
 inline void W(int index){
-	printf("writer %d is writing\n",index);
+	printf("Writer %d : write\n",index);
 	sleep(sleepTime);
 }
 
-inline void R(int index){
-	printf("reader %d is reading\n",index);
+inline void R(int index,int rcount){
+	printf("Reader %d : read, total reader: %d\n",index,rcount);
 	sleep(sleepTime);
 }
 
@@ -47,7 +47,7 @@ void reader(int index,sem_t* writemutex,sem_t* countmutex){
 		sleep(sleepTime);
 
 
-		R(index);
+		R(index,Rcount);
 		//printf("reader %d wait for count\n",index);
 
 		sem_wait(countmutex);

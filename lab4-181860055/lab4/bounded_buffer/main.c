@@ -1,6 +1,7 @@
 #include "lib.h"
 #include "types.h"
 #define MAX_SLEEP_TIME 128
+#define Round 4
 #define sleepTime rand()%MAX_SLEEP_TIME
 
 void produce(int index){
@@ -35,7 +36,7 @@ void deposit(sem_t* mutex, sem_t* fullBuffers, sem_t* emptyBuffers,int index)
 }
 void remove(sem_t* mutex, sem_t* fullBuffers, sem_t* emptyBuffers,int index)
 {
-	int i = 4;
+	int i = 8;
 	while (i-- > 0)
 	{
 		//printf("consumer %d is waiting for read\n",index);

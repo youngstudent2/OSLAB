@@ -64,9 +64,9 @@ void sem_test(){
 		while (i != 0)
 		{
 			i--;
-			printf("Child Process: Semaphore Waiting. %d\n",i);
+			printf("Child Process: Semaphore Waiting.\n");
 			sem_wait(&sem);
-			printf("Child Process: In Critical Area. %d\n",i);
+			printf("Child Process: In Critical Area.\n");
 		}
 		printf("Child Process: Semaphore Destroying.\n");
 		sem_destroy(&sem);
@@ -87,26 +87,34 @@ void sem_test(){
 		exit();
 	}
 }
+void final_test()
+{
+	char ch;
+	printf("Input: 1 for bounded_buffer\n       2 for philosopher\n       3 for reader_writer\n");
+	scanf("%c", &ch);
+
+	switch (ch)
+	{
+	case '1':
+		exec("/usr/bounded_buffer", 0);
+		break;
+	case '2':
+		exec("/usr/philosopher", 0);
+		break;
+	case '3':
+		exec("/usr/reader_writer", 0);
+		break;
+	default:
+		break;
+	}
+}
 int uEntry(void) {
 
-
-	char ch;	
-	printf("Input: 1 for bounded_buffer\n       2 for philosopher\n       3 for reader_writer\n");
-	scanf("%c",&ch);
+	//scanf_test();
+	//shMem_test();
+	//sem_test();
+	final_test();
 	
-	switch (ch) {
-		case '1':
-			exec("/usr/bounded_buffer", 0);
-			break;
-		case '2':
-			exec("/usr/philosopher", 0);
-			break;
-		case '3':
-			exec("/usr/reader_writer", 0);
-			break;
-		default:
-			break;
-	}
 	
 	exit();
 	return 0;
