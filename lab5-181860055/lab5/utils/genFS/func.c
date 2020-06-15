@@ -407,6 +407,76 @@ int allocInode (FILE *file, SuperBlock *superBlock, Inode *fatherInode, int fath
     return 0;
 }
 
+int freeInode (FILE *file, SuperBlock *superBlock, Inode *fatherInode, int fatherInodeOffset,
+        Inode *destInode, int *destInodeOffset, const char *destFilename, int destFiletype) {
+    int i = 0;
+    int j = 0;
+    int ret = 0;
+    int blockOffset = 0;
+    DirEntry *dirEntry = NULL;
+    uint8_t buffer[superBlock->blockSize];
+    int length = stringLen(destFilename);
+
+    if (destFilename == NULL || destFilename[0] == 0)
+        return -1;
+    
+    for (i = 0; i < fatherInode->blockCount; i++) {
+        ret = readBlock(file, superBlock, fatherInode, i, buffer);
+        if (ret == -1)
+            return -1;
+        dirEntry = (DirEntry *)buffer;
+        for (j = 0; j < superBlock->blockSize / sizeof(DirEntry); j++) {
+            if (dirEntry[j].inode == 0) // a valid empty dirEntry
+                continue;
+            else if (stringCmp(dirEntry[j].name, destFilename, length) == 0)
+                break;
+        }
+        if (j < superBlock->blockSize / sizeof(DirEntry))
+            break;
+    }
+    if (i == fatherInode->blockCount) {
+        return -1;
+    }
+    
+    // free destInode
+    *destInodeOffset = dirEntry[j].inode;
+    fseek(file, *destInodeOffset,SEEK_SET);
+    fread((void*)destInode,sizeof(Inode),1,file);
+    if(destInode->type != destFiletype)
+        return -1;
+    DirEntry tmpDirEntry;
+    if(destFiletype == DIRECTORY_TYPE){
+        ret = getDirEntry(file,superBlock,destInode,0,&tmpDirEntry);
+        if(ret != -1){ // directory is not empty , fail
+            return -1;
+        }
+    }
+
+    --destInode->linkCount;
+    if(destInode->linkCount == 0){
+        freeBlock(file,superBlock,destInode,*destInodeOffset);
+        setAllocInode(file,superBlock,*destInodeOffset);
+    }
+    else{
+        fseek(file,*destInodeOffset,SEEK_SET);
+        fwrite((void*)destInode,sizeof(Inode),1,file);
+    }
+
+    dirEntry[j].inode = 0;
+    ret = writeBlock(file,superBlock,fatherInode,i,buffer);
+    if(ret == -1){
+        printf("write block failed.\n");
+        return -1;
+    }
+
+    return 0;
+
+} 
+
+
+
+
+
 int initDir(FILE *file, SuperBlock *superBlock, Inode *fatherInode, int fatherInodeOffset,
         Inode *destInode, int destInodeOffset) {
     int ret = 0;
