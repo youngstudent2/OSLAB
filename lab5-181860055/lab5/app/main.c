@@ -1,121 +1,27 @@
 #include "lib.h"
 #include "types.h"
 
-void scanf_test(){
-	int dec = 0;
-	int hex = 0;
-	char str[6];
-	char cha = 0;
-	int ret = 0;
-	while (1)
-	{
-		printf("Input:\" Test %%c Test %%6s %%d %%x\"\n");
-		ret = scanf(" Test %c Test %6s %d %x", &cha, str, &dec, &hex);
-		printf("Ret: %d; %c, %s, %d, %x.\n", ret, cha, str, dec, hex);
-		if (ret == 4)
-			break;
-	}
-}
-
-void shMem_test(){
-	int data = 2020;
-	int data1 = 1000;
-	int i = 4;
-	int ret = fork();
-	if (ret == 0)
-	{
-		while (i != 0)
-		{
-			i--;
-			printf("Child Process: %d, %d\n", data, data1);
-			write(SH_MEM, (uint8_t *)&data, 4, 0); // define SH_MEM 3
-			data += data1;
-			sleep(128);
-		}
-		exit();
-	}
-	else if (ret != -1)
-	{
-		while (i != 0)
-		{
-			i--;
-			read(SH_MEM, (uint8_t *)&data1, 4, 0);
-			printf("Father Process: %d, %d\n", data, data1);
-			sleep(128);
-		}
-		exit();
-	}
-}
-void sem_test(){
-	int i = 4;
-	int ret = 0;
-	int value = 2;
-	sem_t sem;
-	printf("Father Process: Semaphore Initializing.\n");
-	ret = sem_init(&sem, value);
-	if (ret == -1)
-	{
-		printf("Father Process: Semaphore Initializing Failed.\n");
-		exit();
-	}
-	ret = fork();
-	if (ret == 0)
-	{
-		while (i != 0)
-		{
-			i--;
-			printf("Child Process: Semaphore Waiting.\n");
-			sem_wait(&sem);
-			printf("Child Process: In Critical Area.\n");
-		}
-		printf("Child Process: Semaphore Destroying.\n");
-		sem_destroy(&sem);
-		exit();
-	}
-	else if (ret != -1)
-	{
-		while (i != 0)
-		{
-			i--;
-			printf("Father Process: Sleeping.\n");
-			sleep(128);
-			printf("Father Process: Semaphore Posting.\n");
-			sem_post(&sem);
-		}
-		printf("Father Process: Semaphore Destroying.\n");
-		sem_destroy(&sem);
-		exit();
-	}
-}
-void final_test()
+int uEntry(void)
 {
-	char ch;
-	printf("Input: 1 for bounded_buffer\n       2 for philosopher\n       3 for reader_writer\n");
-	scanf("%c", &ch);
+    int fd = 0;
+    int i = 0;
+    char tmp = 0;
 
-	switch (ch)
-	{
-	case '1':
-		exec("/usr/bounded_buffer", 0);
-		break;
-	case '2':
-		exec("/usr/philosopher", 0);
-		break;
-	case '3':
-		exec("/usr/reader_writer", 0);
-		break;
-	default:
-		break;
-	}
-}
-int uEntry(void) {
+    ls("/");      // 列出"/"⽬录下的所有⽂件
+    ls("/boot/"); // 列出"/boot/"⽬录下的所有⽂件
+    ls("/dev/");  // 列出"/dev/"⽬录下的所有⽂件
+    ls("/usr/");  // 列出"/usr/"⽬录下的所有⽂件
 
-	//scanf_test();
-	//shMem_test();
-	//sem_test();
-	final_test();
-	
-	
-	exit();
-	return 0;
+    printf("create /usr/test and write alphabets to it\n");
+    fd = open("/usr/test", O_RDWR | O_CREAT); // 创建⽂件"/usr/test"
+    for (i = 0; i < 512; i++)
+    { // 向"/usr/test"⽂件中写⼊字⺟表
+        tmp = (char)(i % 26 + 'A');
+        write(fd, (uint8_t *)&tmp, 1);
+    }
+    close(fd);
+    ls("/usr/");      // 列出"/usr/"⽬录下的所有⽂件
+    cat("/usr/test"); // 在终端中打印"/usr/test"⽂件的内容
+    exit();
+    return 0;
 }
