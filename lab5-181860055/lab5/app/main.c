@@ -3,6 +3,7 @@
 
 int uEntry(void)
 {
+    /*
     int fd = 0;
     int i = 0;
     char tmp = 0;
@@ -21,7 +22,7 @@ int uEntry(void)
     }
     close(fd);
     ls("/usr/");      // 列出"/usr/"⽬录下的所有⽂件
-    cat("/usr/test"); // 在终端中打印"/usr/test"⽂件的内容
+    cat("/usr/test"); // 在终端中打印"/usr/test"⽂件的内容*/
     exit();
     return 0;
 }

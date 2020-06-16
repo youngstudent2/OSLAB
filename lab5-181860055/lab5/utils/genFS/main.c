@@ -37,6 +37,30 @@ int main(int argc, char *argv[]) {
     stringCpy("/usr/reader_writer", destFilePath, NAME_LENGTH - 1);
     cp(driver, srcFilePath, destFilePath);
 
+
+    /* for test rmdir */
+    stringCpy("/tmp", destFilePath, NAME_LENGTH - 1);
+    mkdir(driver, destFilePath);
+
+    /* for test rm */
+    stringCpy(argv[5], srcFilePath, NAME_LENGTH - 1);
+    stringCpy("/tmp/reader_writer", destFilePath, NAME_LENGTH - 1);
+    cp(driver, srcFilePath, destFilePath);
+
+    stringCpy("/tmp", destFilePath, NAME_LENGTH - 1);
+    ls(driver, destFilePath);
+
+    stringCpy("/tmp/reader_writer", destFilePath, NAME_LENGTH - 1);
+    rm(driver, destFilePath);
+
+    stringCpy("/tmp", destFilePath, NAME_LENGTH - 1);
+    ls(driver, destFilePath);
+
+    stringCpy("/tmp", destFilePath, NAME_LENGTH - 1);
+    rmdir(driver, destFilePath);
+
+    /****/
+
     stringCpy("/", destFilePath, NAME_LENGTH - 1);
     ls(driver, destFilePath);
 
