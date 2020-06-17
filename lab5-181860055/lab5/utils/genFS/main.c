@@ -53,12 +53,15 @@ int main(int argc, char *argv[]) {
     stringCpy("/tmp/reader_writer", destFilePath, NAME_LENGTH - 1);
     rm(driver, destFilePath);
 
+    printf("rm finish\n");
+
     stringCpy("/tmp", destFilePath, NAME_LENGTH - 1);
     ls(driver, destFilePath);
 
     stringCpy("/tmp", destFilePath, NAME_LENGTH - 1);
     rmdir(driver, destFilePath);
 
+    printf("rmdir finish\n");
     /****/
 
     stringCpy("/", destFilePath, NAME_LENGTH - 1);

@@ -543,7 +543,6 @@ int freeInode (FILE *file, SuperBlock *superBlock, Inode *fatherInode, int fathe
 
     if (destFilename == NULL || destFilename[0] == 0)
         return -1;
-    
     for (i = 0; i < fatherInode->blockCount; i++) {
         ret = readBlock(file, superBlock, fatherInode, i, buffer);
         if (ret == -1)
@@ -561,17 +560,19 @@ int freeInode (FILE *file, SuperBlock *superBlock, Inode *fatherInode, int fathe
     if (i == fatherInode->blockCount) {
         return -1;
     }
-    
+
     // free destInode
-    *destInodeOffset = dirEntry[j].inode;
+    *destInodeOffset = superBlock->inodeTable * SECTOR_SIZE+(dirEntry[j].inode - 1)*sizeof(Inode);
     fseek(file, *destInodeOffset,SEEK_SET);
     fread((void*)destInode,sizeof(Inode),1,file);
+    
     if(destInode->type != destFiletype)
         return -1;
+
     DirEntry tmpDirEntry;
     if(destFiletype == DIRECTORY_TYPE){
         ret = getDirEntry(file,superBlock,destInode,0,&tmpDirEntry);
-        if(ret != -1){ // directory is not empty , fail
+        if(ret != 0){ // directory is not empty , fail
             return -1;
         }
     }
@@ -585,7 +586,6 @@ int freeInode (FILE *file, SuperBlock *superBlock, Inode *fatherInode, int fathe
         fseek(file,*destInodeOffset,SEEK_SET);
         fwrite((void*)destInode,sizeof(Inode),1,file);
     }
-
     dirEntry[j].inode = 0;
     ret = writeBlock(file,superBlock,fatherInode,i,buffer);
     if(ret == -1){
@@ -902,7 +902,7 @@ int rmdir (const char *driver, const char *destDirPath) {
     ret = freeInode(file, &superBlock, &fatherInode, fatherInodeOffset,
         &destInode, &destInodeOffset, destDirPath + size + 1, DIRECTORY_TYPE);
     if (ret == -1) {
-        printf("Failed to allocate inode.\n");
+        printf("Failed to free inode and its blocks.\n");
         if (cond == 1)
             *((char*)destDirPath + length - 1) = '/';
         fclose(file);
