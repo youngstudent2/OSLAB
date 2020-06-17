@@ -65,6 +65,16 @@ struct Device {
 };
 typedef struct Device Device;
 
+#define MAX_FIL_NUM 4
+struct File{
+	int state;
+	int inodeOffset;	//xxx inodeOffset in filesystem, for syscall open
+	int offset;			//XXX offset from SEEK_SET
+	int flags;
+};
+typedef struct File File;
+
+
 #define MAX_STACK_SIZE 4096
 #define MAX_PCB_NUM ((NR_SEGMENTS-2)/2)
 

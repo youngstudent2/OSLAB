@@ -11,6 +11,10 @@
 #define SYS_READ 5
 #define SYS_SEM 6
 #define SYS_GETPID 7
+#define SYS_OPEN 8
+#define SYS_LSEEK 9
+#define SYS_CLOSE 10
+#define SYS_REMOVE 11
 
 #define STD_OUT 0
 #define STD_IN 1
@@ -22,6 +26,15 @@
 #define SEM_DESTROY 3
 
 #define MAX_BUFFER_SIZE 256
+
+#define O_WRITE 0x01
+#define O_READ 0x02
+#define O_CREATE 0x04
+#define O_DIRECTORY 0x08
+
+#define SEEK_SET 0
+#define SEEK_CUR 1
+#define SEEK_END 2
 
 int printf(const char *format,...);
 
@@ -48,6 +61,14 @@ int sem_post(sem_t *sem);
 int sem_destroy(sem_t *sem);
 
 int getpid();
+
+int open(const char* filename, uint8_t mode);
+
+int lseek(int fd, uint32_t offset, uint8_t origin);
+
+int remove(const char *filename);
+
+int close(int fd);
 
 // add rand method
 int index;

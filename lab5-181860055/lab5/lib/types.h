@@ -13,4 +13,5 @@ typedef uint32_t size_t;
 typedef int32_t  pid_t;
 typedef int32_t sem_t;
 
+#define NULL ((void*)0)
 #endif

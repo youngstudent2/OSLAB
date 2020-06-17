@@ -12,6 +12,7 @@ int current; // current process
 
 Semaphore sem[MAX_SEM_NUM];
 Device dev[MAX_DEV_NUM];
+File file[MAX_FILE_NUM];
 
 /*
 MACRO
@@ -87,6 +88,18 @@ void initDev() {
 		dev[i].pcb.prev = &(dev[i].pcb);
 	}
 }
+
+void initFile(){
+	int i;
+	for(i=0;i<MAX_FILE_NUM;++i){
+		file[i].state = 0;
+		file[i].inodeOffset = 0;
+		file[i].offset = 0;
+		file[i].flags = 0;
+	}
+}
+
+
 
 int loadElf(const char *filename, uint32_t physAddr, uint32_t *entry) {
 	int i = 0;

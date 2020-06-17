@@ -17,5 +17,6 @@ void kEntry(void) {
 	initFS(); // initialize file system
 	initSem(); // initialize semaphore list
 	initDev(); // initialize device list
+	initFile();
 	initProc(); // initialize pcb & load user program
 }

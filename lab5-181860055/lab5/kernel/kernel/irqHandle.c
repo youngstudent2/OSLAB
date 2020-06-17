@@ -9,6 +9,10 @@
 #define SYS_READ 5
 #define SYS_SEM 6
 #define SYS_GETPID 7
+#define SYS_OPEN 8
+#define SYS_LSEEK 9
+#define SYS_CLOSE 10
+#define SYS_REMOVE 11
 
 #define STD_OUT 0
 #define STD_IN 1
@@ -18,6 +22,15 @@
 #define SEM_WAIT 1
 #define SEM_POST 2
 #define SEM_DESTROY 3
+
+#define O_WRITE 0x01
+#define O_READ 0x02
+#define O_CREATE 0x04
+#define O_DIRECTORY 0x08
+
+#define SEEK_SET 0
+#define SEEK_CUR 1
+#define SEEK_END 2
 
 extern TSS tss;
 extern ProcessTable pcb[MAX_PCB_NUM];
@@ -118,6 +131,19 @@ void syscallHandle(struct TrapFrame *tf) {
 		case SYS_GETPID:
 			syscallGetPid(tf);
 			break; // for SYS_GETPID
+		case SYS_OPEN:
+			syscallOpen(tf);
+			break;
+		case SYS_LSEEK:
+			syscallLseek(tf);
+			break;
+		case SYS_CLOSE:
+			syscallClose(tf);
+			break;
+		case SYS_REMOVE:
+			syscallRemove(tf);
+			break;
+
 		default:break;
 	}
 }
@@ -556,5 +582,25 @@ void syscallGetPid(struct TrapFrame *tf) {
 
 void GProtectFaultHandle(struct TrapFrame *tf){
 	assert(0);
+	return;
+}
+
+void syscallOpen(struct TrapFrame *tf) {
+
+	return;
+}
+
+void syscallLseek(struct TrapFrame *tf) {
+
+	return;
+}
+
+void syscallClose(struct TrapFrame *tf) {
+
+	return;
+}
+
+void syscallRemove(struct TrapFrame *tf) {
+
 	return;
 }
