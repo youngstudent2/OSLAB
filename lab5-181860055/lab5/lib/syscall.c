@@ -687,19 +687,16 @@ int exit()
 
 int write(int fd, uint8_t *buffer, int size, ...)
 {
-	//printf("start write!\n");
 	int index = 0;
 	if (fd == SH_MEM)
 	{
 		index = *(int *)((void *)&size + 4);
 	}
-	//printf("%s\n",(char*)buffer);
 	return syscall(SYS_WRITE, fd, (uint32_t)buffer, size, index, 0);
 }
 
 int read(int fd, uint8_t *buffer, int size, ...)
 {
-	//printf("read!\n");
 	int index = 0;
 	if (fd == SH_MEM)
 	{
@@ -738,7 +735,6 @@ int getpid()
 }
 
 int open(const char* filename, uint8_t mode){
-
 	return syscall(SYS_OPEN,filename,mode,0,0,0);
 }	
 

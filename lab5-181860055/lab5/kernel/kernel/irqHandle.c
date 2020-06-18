@@ -1,5 +1,6 @@
 #include "x86.h"
 #include "device.h"
+#include "fs.h"
 
 #define SYS_WRITE 0
 #define SYS_FORK 1
@@ -38,6 +39,9 @@ extern int current;
 
 extern Semaphore sem[MAX_SEM_NUM];
 extern Device dev[MAX_DEV_NUM];
+extern File file[MAX_FILE_NUM];
+
+extern SuperBlock sBlock;
 
 extern int displayRow;
 extern int displayCol;
@@ -226,7 +230,7 @@ void keyboardHandle(struct TrapFrame *tf) {
 	return;
 }
 
-void syscallWrite(struct TrapFrame *tf) {
+void syscallWrite(struct TrapFrame *tf) {	
 	switch(tf->ecx) { // file descriptor
 		case STD_OUT:
 			if (dev[STD_OUT].state == 1) {
@@ -238,7 +242,14 @@ void syscallWrite(struct TrapFrame *tf) {
 				syscallWriteShMem(tf);
 			}
 			break; // for SH_MEM
-		default:break;
+		default:
+			break;
+	}
+	int fd = tf->ecx - MAX_DEV_NUM;
+	if(fd >=0 && fd < MAX_DEV_NUM+MAX_FILE_NUM){
+		if(file[fd].state == 1){
+			syscallWriteFile(tf);
+		}
 	}
 }
 
@@ -292,15 +303,81 @@ void syscallWriteShMem(struct TrapFrame *tf) {
 	//int fd = tf->ecx;
 	char *str = (char*)tf->edx;
 	char character = 0;
-	putInt(size);
-	putInt(index);
 	asm volatile("movw %0, %%es"::"m"(sel));
 	for(int i=0;i<size;++i){
 		asm volatile("movb %%es:(%1), %0":"=r"(character):"r"(str + i));
-		//putChar(character);
 		*(shMem+index+i) = character;
 	}
 	return;
+}
+
+void syscallWriteFile(struct TrapFrame *tf){
+	int fd = tf->ecx - MAX_DEV_NUM;
+	if(!(file[fd].flags & O_WRITE)){
+		tf->eax = 01;
+		return;
+	}
+	int i = 0;
+	int j = 0;
+	int ret = 0;
+	int count=0;
+	int sel = tf->ds;
+	char* *str = (char*)tf->edx;
+	char buffer[SECTOR_SIZE * SECTORS_PER_BLOCK];
+	int quotient = file[fd].offset / sBlock.blockSize;
+	int remainder = file[fd].offset % sBlock.blockSize;
+	int size = tf->ebx;
+	asm volatile("movw %0, %%es"::"m"(sel));
+
+	Inode inode;
+	diskRead(&inode,sizeof(Inode),1,file[fd].inodeOffset);
+	if(size<=0){
+		tf->eax = 0;
+		return;
+	}
+
+	if(inode.type == DIRECTORY_TYPE || file[fd].offset>inode.size){
+		tf->eax = -1;
+		return;
+	}
+
+	readSuperBlock(&sBlock);
+
+	// write file
+
+	int *fileOffset = &file[fd].offset;
+	for(i=0,j=remainder;i<size;){
+		if(quotient>=inode.blockCount){
+			ret = allocBlock(&sBlock,&inode,file[fd].inodeOffset);
+			if(ret == -1){
+				break;
+			}
+		}
+		ret = readBlock(&sBlock,&inode,quotient,buffer);
+		if(ret == -1){
+			break;
+		}
+		for(;j<SECTOR_SIZE*SECTORS_PER_BLOCK&&i<size;++j,++i){
+			asm volatile("movb %%es:(%1), %0":"=r"(buffer + j):"r"(str + i));
+			(*fileOffset)++;
+		}
+		j = 0;
+		ret = writeBlock(&sBlock,&inode,quotient,buffer);
+		if(ret == -1){
+			break;
+		}
+		quotient++;
+	}
+	count = i;
+	if(file[fd].offset > inode.size){
+		inode.size = file[fd].offset;
+		diskWrite(&inode,sizeof(Inode),1,file[fd].inodeOffset);
+	}
+
+	tf->eax = count;
+	return;
+
+
 }
 
 void syscallRead(struct TrapFrame *tf) {
@@ -317,6 +394,12 @@ void syscallRead(struct TrapFrame *tf) {
 			break;
 		default:
 			break;
+	}
+	int fd = tf->ecx - MAX_DEV_NUM;
+	if(fd >=0 && fd < MAX_DEV_NUM+MAX_FILE_NUM){
+		if(file[fd].state == 1){
+			syscallReadFile(tf);
+		}
 	}
 }
 
@@ -364,26 +447,77 @@ void syscallReadStdIn(struct TrapFrame *tf) {
 }
 
 void syscallReadShMem(struct TrapFrame *tf) {
-	// TODO in lab4
-	//putString("sys read now \n");
 	int size = tf->ebx;
 	int sel = tf->ds;
 	int index = tf->esi;
 	//int fd = tf->ecx;
 	char *str = (char*)tf->edx;
 	char character = 0;
-	putInt(size);
-	putInt(index);
 	
 	asm volatile("movw %0, %%es"::"m"(sel));
 	for(int i=0;i<size;++i){
-		character = *(shMem+index+i);
-		//putChar(character);
 		asm volatile("movb %0, %%es:(%1)"::"r"(character),"r"(str+i));
 	}
 
 
 	return;
+}
+
+void syscallReadFile(struct TrapFrame *tf) {
+	int fd = tf->ecx - MAX_DEV_NUM;
+	if(!(file[fd].flags&O_READ)){
+		tf->eax = -1;
+		return;
+	}
+
+	int ret = 0;
+	int size = tf->ebx;
+	int sel = tf->ds;
+	char *str = (char*)tf->edx;
+	int i = 0;
+	int j = 0;
+	char buffer[SECTOR_SIZE * SECTORS_PER_BLOCK];
+	int quotient = file[fd].offset / sBlock.blockSize;
+	int remainder = file[fd].offset % sBlock.blockSize;
+	asm volatile("movw %0, %%es"::"m"(sel));
+
+	Inode inode;
+	diskRead(&inode,sizeof(Inode),1,file[fd].inodeOffset);
+
+	if(file[fd].offset>inode.size){
+		tf->eax = -1;
+		return;
+	}
+
+	if(size>inode.size-file[fd].offset){ 		
+		size = inode.size - file[fd].offset;
+	}
+
+	if(size<=0){
+		tf->eax = 0;
+		return;
+	}
+
+	readSuperBlock(&sBlock);
+	int *fileOffset = &file[fd].offset;
+	for(i=0,j=remainder;i<size;){
+		if(quotient>=inode.blockCount){
+			break;
+		}
+		ret = readBlock(&sBlock,&inode,quotient,buffer);
+		if(ret == -1){
+			break;
+		}
+		for(;j<SECTORS_PER_BLOCK*SECTOR_SIZE&&i<size;++j,++i){
+			asm volatile("movb %0, %%es:(%1)"::"r"(buffer + j),"r"(str+i));
+			(*fileOffset)++;
+		}
+		j = 0;
+		quotient++;
+	}
+	tf->eax = i;
+	return;
+
 }
 
 void syscallFork(struct TrapFrame *tf) {
@@ -586,17 +720,185 @@ void GProtectFaultHandle(struct TrapFrame *tf){
 }
 
 void syscallOpen(struct TrapFrame *tf) {
+	int i;
+	int length = 0;
+	int ret = 0;
+	int size = 0;
+	int baseAddr = (current + 1) * 0x100000; // base address of user process
+	char *str = (char*)tf->ecx + baseAddr; // file path
+	char fatherPath[NAME_LENGTH<<3];
+	char filename[NAME_LENGTH];
+	Inode fatherInode;
+	Inode destInode;
+	int fatherInodeOffset = 0;
+	int destInodeOffset = 0;
+
+	uint8_t mode = tf->edx;
+	uint8_t o_create = mode & O_CREATE;
+	uint8_t o_directory = mode & O_DIRECTORY;
+	uint8_t o_read = mode & O_READ;
+	uint8_t o_write = mode & O_WRITE;
+	if(o_directory&&o_write){
+		tf->eax = -1;
+		return;
+	}
+	readSuperBlock(&sBlock);
+	ret = readInode(&sBlock,&destInode,&destInodeOffset,str);
+
+	
+	if(ret == 0){
+		if((destInode.type == DIRECTORY_TYPE)^(o_directory>0)){
+			tf->eax = -1;
+			return;
+		}
+		
+		for(i=0;i<MAX_DEV_NUM;++i){
+			if(dev[i].state&&dev[i].inodeOffset==destInodeOffset){
+				--dev[i].value;
+				if(dev[i].value<0){
+					pcb[current].blocked.next = dev[i].pcb.next;
+					pcb[current].blocked.prev = &(dev[i].pcb);
+					dev[i].pcb.next = &(pcb[current].blocked);
+					(pcb[current].blocked.next)->prev = &(pcb[current].blocked);
+					pcb[current].state = STATE_BLOCKED;
+					pcb[current].sleepTime = 0xFFFFFFF;
+					tf->eax = 0;
+					asm volatile("int $0x20");
+				}
+				tf->eax = i;
+				return;
+			}
+		}
+		
+
+		for(i=0;i<MAX_FILE_NUM;++i){
+			if(!file[i].state){
+				file[i].state = 1;
+				file[i].inodeOffset = destInodeOffset;
+				file[i].flags = mode;
+				file[i].offset = 0;
+				tf->eax = i + MAX_DEV_NUM;			
+				return;
+			}
+		}
+
+	}
+	else{
+		if(!o_create){
+			tf->eax = -1;
+			return;
+		}
+		length = stringLen(str);
+		if(str[length-1]=='/'){
+			if(!o_directory){
+				tf->eax = -1;
+				return;
+			}
+			--length;
+		}
+		stringCpy(str,fatherPath,length);
+		stringChrR(fatherPath,'/',&size);
+		stringCpy(str+size+1,filename,length);
+
+		readSuperBlock(&sBlock);
+		ret = readInode(&sBlock, &fatherInode, &fatherInodeOffset, fatherPath);
+		if(ret == -1){
+			tf->eax = -1;
+			return;
+		}
+		for (i = 0; i < MAX_FILE_NUM; ++i)
+		{
+			if (!file[i].state)
+			{
+				break;
+			}
+		}
+		if (i == MAX_FILE_NUM)
+		{
+			tf->eax = -1;
+			return;
+		}
+		readSuperBlock(&sBlock);
+		ret = allocInode(&sBlock, &fatherInode, fatherInodeOffset, &destInode, &destInodeOffset,
+						 filename, o_directory ? DIRECTORY_TYPE : REGULAR_TYPE);
+
+		if (ret == -1)
+		{
+			tf->eax = -1;
+			return;
+		}
+		file[i].state = 1;
+		file[i].inodeOffset = destInodeOffset;
+		file[i].flags = mode;
+		file[i].offset = 0;
+		tf->eax = i + MAX_DEV_NUM;
+	}
 
 	return;
 }
 
 void syscallLseek(struct TrapFrame *tf) {
+	int fd = tf->ecx - MAX_DEV_NUM;
+	if(fd<0||fd>=MAX_FILE_NUM){
+		tf->eax = -1;
+		return;
+	}
+	int target = -1;
+	int whence = tf->ebx;
+	Inode inode;
+	diskReadd(&inode,sizeof(Inode),1,file[fd].inodeOffset);
+	switch(whence){
+		case SEEK_SET:
+			target = tf->edx;
+			break;
+		case SEEK_CUR:
+			target = tf->edx + file[fd].offset;
+			break;
+		case SEEK_END:
+			target = tf->edx + inode.size;
+			break;
+		default:
+			break;
+	}
 
+	if(target<0||target>inode.size){
+		tf->eax = -1;
+		return;
+	}
+
+	file[fd].offset = target;
+	tf->eax = target;
 	return;
 }
 
 void syscallClose(struct TrapFrame *tf) {
-
+	if(tf->ecx<0||tf->ecx>=MAX_DEV_NUM+MAX_FILE_NUM){
+		tf->eax = -1;
+		return;
+	}
+	int fd = tf->ecx - MAX_DEV_NUM;
+	if(fd>0){
+		tf->eax = file[fd].state == 0 ? 0:-1;
+		file[fd].state = 0;
+		return;
+	}
+	else{
+		int i = tf->ecx;
+		if(dev[i].state){
+			dev[i].value++;
+			if(dev[i].value<=0){
+				ProcessTable* pt = (ProcessTable *)((uint32_t)(dev[i].pcb.prev) - (uint32_t) & (((ProcessTable *)0)->blocked));
+				dev[i].pcb.prev = (dev[i].pcb.prev)->prev;
+				(dev[i].pcb.prev)->next = &(dev[i].pcb);
+				pt->state = STATE_RUNNABLE;
+				tf->eax = 0;
+			}
+			tf->eax = 0;
+			return;
+		}
+		tf->eax = -1;
+		return;
+	}
 	return;
 }
 
