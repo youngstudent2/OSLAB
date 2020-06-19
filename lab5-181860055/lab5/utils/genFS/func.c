@@ -429,6 +429,7 @@ int setAllocInode (FILE *file, SuperBlock *superBlock, int inodeOffset) {
     fwrite((void *)superBlock, sizeof(SuperBlock), 1, file);
     fseek(file, inodeBitmapOffset * SECTOR_SIZE, SEEK_SET);
     fwrite((void *)&inodeBitmap, sizeof(InodeBitmap), 1, file);
+    return 0;
 }
 
 int setAllocBlock (FILE *file, SuperBlock *superBlock, int blockOffset) {
@@ -454,6 +455,7 @@ int setAllocBlock (FILE *file, SuperBlock *superBlock, int blockOffset) {
     fwrite((void *)superBlock, sizeof(SuperBlock), 1, file);
     fseek(file, blockBitmapOffset * SECTOR_SIZE, SEEK_SET);
     fwrite((void *)&blockBitmap, sizeof(BlockBitmap), 1, file);    
+    return 0;
 }
 
 int freeLastBlock (FILE *file, SuperBlock *superBlock, Inode *inode, int inodeOffset) {

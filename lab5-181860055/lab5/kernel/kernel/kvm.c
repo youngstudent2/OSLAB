@@ -87,6 +87,15 @@ void initDev() {
 		dev[i].pcb.next = &(dev[i].pcb);
 		dev[i].pcb.prev = &(dev[i].pcb);
 	}
+	Inode inode;
+	int inodeOffset = 0;
+	readSuperBlock(&sBlock);
+	readInode(&sBlock,&inode,&inodeOffset,"/dev/stdout");
+	dev[0].inodeOffset = inodeOffset;
+	readInode(&sBlock,&inode,&inodeOffset,"/dev/stdin");
+	dev[1].inodeOffset = inodeOffset;
+	readInode(&sBlock,&inode,&inodeOffset,"/dev/shmem");
+	dev[3].inodeOffset = inodeOffset;
 }
 
 void initFile(){

@@ -205,7 +205,6 @@ void timerHandle(struct TrapFrame *tf) {
 }
 
 void keyboardHandle(struct TrapFrame *tf) {
-	// TODO in lab4
 	uint32_t keyCode = getKeyCode();
 	if (keyCode == 0)
 		return;
@@ -295,7 +294,6 @@ void syscallWriteStdOut(struct TrapFrame *tf) {
 }
 
 void syscallWriteShMem(struct TrapFrame *tf) {
-	// TODO in lab4
 	
 	int size = tf->ebx;
 	int sel = tf->ds;
@@ -404,7 +402,6 @@ void syscallRead(struct TrapFrame *tf) {
 }
 
 void syscallReadStdIn(struct TrapFrame *tf) {
-	// TODO in lab4
 	if(dev[STD_IN].value == 0){
 		pcb[current].blocked.next = dev[STD_IN].pcb.next;
 		pcb[current].blocked.prev = &(dev[STD_IN].pcb);
@@ -598,8 +595,6 @@ void syscallExec(struct TrapFrame *tf) {
 }
 
 void syscallSleep(struct TrapFrame *tf) {
-	putString("sleep ");putInt(current);
-	putString("sleepTime ");putInt(tf->ecx);
 	if (tf->ecx == 0) {
 		return;
 	}
@@ -637,7 +632,6 @@ void syscallSem(struct TrapFrame *tf) {
 }
 
 void syscallSemInit(struct TrapFrame *tf) {
-	// TODO in lab4
 	uint32_t value = tf->edx;
 	Semaphore* p = NULL;
 	for(int i=0;i<MAX_SEM_NUM;i++){
@@ -657,7 +651,6 @@ void syscallSemInit(struct TrapFrame *tf) {
 }
 
 void syscallSemWait(struct TrapFrame *tf) {
-	// TODO in lab4
 	Semaphore* p = (Semaphore*)tf->edx;
 	p->value--;
 	if(p->value<0){
@@ -677,7 +670,6 @@ void syscallSemWait(struct TrapFrame *tf) {
 }
 
 void syscallSemPost(struct TrapFrame *tf) {
-	// TODO in lab4
 	Semaphore* p = (Semaphore*)tf->edx;
 	p->value++;
 	if(p->value<=0){
@@ -695,7 +687,6 @@ void syscallSemPost(struct TrapFrame *tf) {
 }
 
 void syscallSemDestroy(struct TrapFrame *tf) {
-	// TODO in lab4
 	Semaphore* p = (Semaphore*)tf->edx;
 	if(p->value<0){
 		tf->eax = -1;
@@ -724,8 +715,9 @@ void syscallOpen(struct TrapFrame *tf) {
 	int length = 0;
 	int ret = 0;
 	int size = 0;
-	int baseAddr = (current + 1) * 0x100000; // base address of user process
-	char *str = (char*)tf->ecx + baseAddr; // file path
+	int sel = tf->ds;
+	char *str = (char*)tf->ecx;
+	char filePath[NAME_LENGTH*9];
 	char fatherPath[NAME_LENGTH<<3];
 	char filename[NAME_LENGTH];
 	Inode fatherInode;
@@ -742,8 +734,17 @@ void syscallOpen(struct TrapFrame *tf) {
 		tf->eax = -1;
 		return;
 	}
+
+	asm volatile("movw %0, %%es"::"m"(sel));
+	for(;i<NAME_LENGTH*9-1;++i){
+		asm volatile("movb %%es:(%1), %0":"=r"(filePath+i):"r"(str + i));
+		if(filePath[i]==0)
+			break;
+	}
+	filePath[i] = 0;
+
 	readSuperBlock(&sBlock);
-	ret = readInode(&sBlock,&destInode,&destInodeOffset,str);
+	ret = readInode(&sBlock,&destInode,&destInodeOffset,filePath);
 
 	
 	if(ret == 0){
@@ -788,19 +789,18 @@ void syscallOpen(struct TrapFrame *tf) {
 			tf->eax = -1;
 			return;
 		}
-		length = stringLen(str);
-		if(str[length-1]=='/'){
+		length = stringLen(filePath);
+		if(filePath[length-1]=='/'){
 			if(!o_directory){
 				tf->eax = -1;
 				return;
 			}
 			--length;
 		}
-		stringCpy(str,fatherPath,length);
+		stringCpy(filePath,fatherPath,length);
 		stringChrR(fatherPath,'/',&size);
-		stringCpy(str+size+1,filename,length);
+		stringCpy(filePath+size+1,filename,length-size-1);
 
-		readSuperBlock(&sBlock);
 		ret = readInode(&sBlock, &fatherInode, &fatherInodeOffset, fatherPath);
 		if(ret == -1){
 			tf->eax = -1;
@@ -903,6 +903,94 @@ void syscallClose(struct TrapFrame *tf) {
 }
 
 void syscallRemove(struct TrapFrame *tf) {
+	int i;
+	int length = 0;
+	int ret = 0;
+	int sel = tf->ds;
+	char *str = (char*)tf->ecx;
+	int size = 0;
+	Inode fatherInode;
+	Inode destInode;
+	int fatherInodeOffset = 0;
+	int destInodeOffset = 0;
+	char fatherPath[NAME_LENGTH<<3];
+	char filename[NAME_LENGTH];
+	char filePath[NAME_LENGTH*9];
 
+	asm volatile("movw %0, %%es"::"m"(sel));
+	for(;i<NAME_LENGTH*9-1;++i){
+		asm volatile("movb %%es:(%1), %0":"=r"(filePath+i):"r"(str + i));
+		if(filePath[i]==0)
+			break;
+	}
+	filePath[i] = 0;
+
+	readSuperBlock(&sBlock);
+	ret = readInode(&sBlock,&destInode,&destInodeOffset,filePath);
+
+	if(ret == -1){
+		tf->eax = -1;
+		return;
+	}
+
+	for(i=0;i<MAX_DEV_NUM;++i){
+		if(dev[i].state&&dev[i].inodeOffset==destInodeOffset){
+			tf->eax = -1;
+			return;
+		}
+
+	}
+	for(i=0;i<MAX_FILE_NUM;++i){
+		if(file[i].state&&file[i].inodeOffset==destInodeOffset){
+			tf->eax = -1;
+			return;
+		}
+	}
+	length = stringLen(filePath);
+	if(filePath[length-1]=='/'){
+		--length;
+	}
+	stringCpy(filePath,fatherPath,length);
+	stringChrR(fatherPath,'/',&size);
+	stringCpy(filePath+size+1,filename,length-size-1);
+	ret = readInode(&sBlock, &fatherInode, &fatherInodeOffset, fatherPath);
+	if(ret == -1){
+		tf->eax = -1;
+		return;
+	}
+	ret = removeFile(&fatherInode,&fatherInodeOffset,&destInode,&destInodeOffset,filename);
+	tf->eax = ret;
 	return;
+}
+
+int removeFile(Inode *fatherInode,int *fatherInodeOffset,Inode *destInode,int *destInodeOffset,char *filename){
+	int i = 0;
+	int j = 0;
+	int ret = 0;
+	uint8_t buffer[BLOCK_SIZE];
+	int nextInodeOffset;
+	Inode nextInode;
+	DirEntry *dirEntry;
+	readSuperBlock(&sBlock);
+	if(destInode->type!=DIRECTORY_TYPE){
+		return freeInode(&sBlock,fatherInode,*fatherInodeOffset,destInode,*destInodeOffset,filename,destInode->type);
+	}
+	for(i=0;i<destInode->blockCount;++i){
+		ret = readBlock(&sBlock,destInode,i,buffer);
+		if(ret == -1)
+			return -1;
+		dirEntry = (DirEntry*)buffer;
+		for(j=0;j<sBlock.blockSize/sizeof(DirEntry);++j){
+			if(dirEntry[j].inode>0){
+				nextInodeOffset = dirEntry[j].inode;
+				diskRead(&nextInode,sizeof(Inode),1,nextInodeOffset);
+				ret = removeFile(destInode,destInodeOffset,&nextInode,&nextInodeOffset);
+				if(ret == -1){
+					return -1;
+				}
+			}
+				
+		}
+	}
+	return freeInode(&sBlock,fatherInode,*fatherInodeOffset,destInode,*destInodeOffset,filename,destInode->type);
 }
