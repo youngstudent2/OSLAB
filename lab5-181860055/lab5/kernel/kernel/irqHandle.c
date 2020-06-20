@@ -975,6 +975,7 @@ void syscallRemove(struct TrapFrame *tf) {
 	size++;
 	stringCpy(filePath,fatherPath,size);
 	stringCpy(filePath+size,filename,length-size);
+	
 	ret = readInode(&sBlock, &fatherInode, &fatherInodeOffset, fatherPath);
 	if(ret == -1){
 		tf->eax = -1;

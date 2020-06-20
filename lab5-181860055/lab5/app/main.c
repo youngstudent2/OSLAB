@@ -23,7 +23,7 @@ int uEntry(void)
     ls("/usr/");      // 列出"/usr/"⽬录下的所有⽂件
     cat("/usr/test"); // 在终端中打印"/usr/test"⽂件的内容
     int ret = remove("/usr/test");
-    printf("%d\n",ret);
+    //printf("%d\n",ret);
     ls("/usr/");
     exit();
     return 0;
