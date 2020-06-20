@@ -60,5 +60,30 @@ int main(int argc, char *argv[]) {
 
     stringCpy("/dev", destFilePath, NAME_LENGTH - 1);
     ls(driver, destFilePath);
+
+    /*** test for rm and rmdir ***/
+
+    stringCpy("/tmp", destFilePath, NAME_LENGTH - 1);
+    mkdir(driver, destFilePath);
+
+    stringCpy("/tmp/test", destFilePath, NAME_LENGTH - 1);
+    touch(driver, destFilePath);
+
+    stringCpy("/tmp", destFilePath, NAME_LENGTH - 1);
+    ls(driver, destFilePath);
+
+    stringCpy("/tmp/test", destFilePath, NAME_LENGTH - 1);
+    rm(driver, destFilePath);
+
+    stringCpy("/tmp", destFilePath, NAME_LENGTH - 1);
+    ls(driver, destFilePath);
+
+    stringCpy("/tmp", destFilePath, NAME_LENGTH - 1);
+    rmdir(driver, destFilePath);
+
+    stringCpy("/", destFilePath, NAME_LENGTH - 1);
+    ls(driver, destFilePath);
+
+    /*** end test ***/
     return 0;
 }

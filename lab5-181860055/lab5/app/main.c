@@ -11,10 +11,10 @@ int uEntry(void)
     ls("/boot/"); // 列出"/boot/"⽬录下的所有⽂件
     ls("/dev/");  // 列出"/dev/"⽬录下的所有⽂件
     ls("/usr/");  // 列出"/usr/"⽬录下的所有⽂件
-    sleep(500);
+
     printf("create /usr/test and write alphabets to it\n");
     fd = open("/usr/test", O_WRITE | O_CREATE); // 创建⽂件"/usr/test"
-    for (i = 0; i < 512; i++)
+    for (i = 0; i < 26; i++)
     { // 向"/usr/test"⽂件中写⼊字⺟表
         tmp = (char)(i % 26 + 'A');
         write(fd, (uint8_t *)&tmp, 1);
@@ -23,7 +23,7 @@ int uEntry(void)
     ls("/usr/");      // 列出"/usr/"⽬录下的所有⽂件
     cat("/usr/test"); // 在终端中打印"/usr/test"⽂件的内容
     remove("/usr/test");
- 
+    printf("remove /usr/test\n");
     ls("/usr/");
     exit();
     return 0;
