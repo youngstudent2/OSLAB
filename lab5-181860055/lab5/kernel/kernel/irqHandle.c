@@ -33,6 +33,7 @@
 #define SEEK_CUR 1
 #define SEEK_END 2
 
+
 extern TSS tss;
 extern ProcessTable pcb[MAX_PCB_NUM];
 extern int current;
@@ -62,10 +63,17 @@ void syscallExit(struct TrapFrame *tf);
 void syscallSem(struct TrapFrame *tf);
 void syscallGetPid(struct TrapFrame *tf);
 
+void syscallOpen(struct TrapFrame *tf);
+void syscallLseek(struct TrapFrame *tf);
+void syscallClose(struct TrapFrame *tf);
+void syscallRemove(struct TrapFrame *tf);
+
 void syscallWriteStdOut(struct TrapFrame *tf);
 void syscallReadStdIn(struct TrapFrame *tf);
 void syscallWriteShMem(struct TrapFrame *tf);
 void syscallReadShMem(struct TrapFrame *tf);
+void syscallWriteFile(struct TrapFrame *tf);
+void syscallReadFile(struct TrapFrame *tf);
 
 void GProtectFaultHandle(struct TrapFrame *tf);
 
@@ -76,6 +84,8 @@ void syscallSemInit(struct TrapFrame *tf);
 void syscallSemWait(struct TrapFrame *tf);
 void syscallSemPost(struct TrapFrame *tf);
 void syscallSemDestroy(struct TrapFrame *tf);
+
+int removeFile(Inode *fatherInode,int *fatherInodeOffset,Inode *destInode,int *destInodeOffset,char *filename);
 
 void irqHandle(struct TrapFrame *tf) { // pointer tf = esp
 	/*
@@ -320,8 +330,9 @@ void syscallWriteFile(struct TrapFrame *tf){
 	int ret = 0;
 	int count=0;
 	int sel = tf->ds;
-	char* *str = (char*)tf->edx;
+	char* str = (char*)tf->edx;
 	char buffer[SECTOR_SIZE * SECTORS_PER_BLOCK];
+	char ch;
 	int quotient = file[fd].offset / sBlock.blockSize;
 	int remainder = file[fd].offset % sBlock.blockSize;
 	int size = tf->ebx;
@@ -351,16 +362,17 @@ void syscallWriteFile(struct TrapFrame *tf){
 				break;
 			}
 		}
-		ret = readBlock(&sBlock,&inode,quotient,buffer);
+		ret = readBlock(&sBlock,&inode,quotient,(uint8_t*)buffer);
 		if(ret == -1){
 			break;
 		}
 		for(;j<SECTOR_SIZE*SECTORS_PER_BLOCK&&i<size;++j,++i){
-			asm volatile("movb %%es:(%1), %0":"=r"(buffer + j):"r"(str + i));
+			asm volatile("movb %%es:(%1), %0":"=r"(ch):"r"(str + i));
+			buffer[j] = ch;
 			(*fileOffset)++;
 		}
 		j = 0;
-		ret = writeBlock(&sBlock,&inode,quotient,buffer);
+		ret = writeBlock(&sBlock,&inode,quotient,(uint8_t*)buffer);
 		if(ret == -1){
 			break;
 		}
@@ -453,9 +465,9 @@ void syscallReadShMem(struct TrapFrame *tf) {
 	
 	asm volatile("movw %0, %%es"::"m"(sel));
 	for(int i=0;i<size;++i){
+		character = *(shMem+index+i);
 		asm volatile("movb %0, %%es:(%1)"::"r"(character),"r"(str+i));
 	}
-
 
 	return;
 }
@@ -476,6 +488,7 @@ void syscallReadFile(struct TrapFrame *tf) {
 	char buffer[SECTOR_SIZE * SECTORS_PER_BLOCK];
 	int quotient = file[fd].offset / sBlock.blockSize;
 	int remainder = file[fd].offset % sBlock.blockSize;
+	char ch;
 	asm volatile("movw %0, %%es"::"m"(sel));
 
 	Inode inode;
@@ -501,12 +514,13 @@ void syscallReadFile(struct TrapFrame *tf) {
 		if(quotient>=inode.blockCount){
 			break;
 		}
-		ret = readBlock(&sBlock,&inode,quotient,buffer);
+		ret = readBlock(&sBlock,&inode,quotient,(uint8_t*)buffer);
 		if(ret == -1){
 			break;
 		}
 		for(;j<SECTORS_PER_BLOCK*SECTOR_SIZE&&i<size;++j,++i){
-			asm volatile("movb %0, %%es:(%1)"::"r"(buffer + j),"r"(str+i));
+			ch = buffer[j];
+			asm volatile("movb %0, %%es:(%1)"::"r"(ch),"r"(str+i));
 			(*fileOffset)++;
 		}
 		j = 0;
@@ -728,24 +742,26 @@ void syscallOpen(struct TrapFrame *tf) {
 	uint8_t mode = tf->edx;
 	uint8_t o_create = mode & O_CREATE;
 	uint8_t o_directory = mode & O_DIRECTORY;
-	uint8_t o_read = mode & O_READ;
+	//uint8_t o_read = mode & O_READ;
 	uint8_t o_write = mode & O_WRITE;
 	if(o_directory&&o_write){
 		tf->eax = -1;
 		return;
 	}
-
+	char ch;
 	asm volatile("movw %0, %%es"::"m"(sel));
-	for(;i<NAME_LENGTH*9-1;++i){
-		asm volatile("movb %%es:(%1), %0":"=r"(filePath+i):"r"(str + i));
-		if(filePath[i]==0)
+	for(i=0;i<NAME_LENGTH*9-1;++i){
+		asm volatile("movb %%es:(%1), %0":"=r"(ch):"r"(str + i));
+		filePath[i] = ch;
+		if(ch==0)
 			break;
 	}
 	filePath[i] = 0;
-
+	putString("open filepath:");
+	putString(filePath);
+	putChar('\n');
 	readSuperBlock(&sBlock);
 	ret = readInode(&sBlock,&destInode,&destInodeOffset,filePath);
-
 	
 	if(ret == 0){
 		if((destInode.type == DIRECTORY_TYPE)^(o_directory>0)){
@@ -797,10 +813,11 @@ void syscallOpen(struct TrapFrame *tf) {
 			}
 			--length;
 		}
-		stringCpy(filePath,fatherPath,length);
-		stringChrR(fatherPath,'/',&size);
-		stringCpy(filePath+size+1,filename,length-size-1);
-
+		
+		stringChrR(filePath,'/',&size);
+		++size;
+		stringCpy(filePath,fatherPath,size);
+		stringCpy(filePath+size,filename,length-size);
 		ret = readInode(&sBlock, &fatherInode, &fatherInodeOffset, fatherPath);
 		if(ret == -1){
 			tf->eax = -1;
@@ -846,7 +863,7 @@ void syscallLseek(struct TrapFrame *tf) {
 	int target = -1;
 	int whence = tf->ebx;
 	Inode inode;
-	diskReadd(&inode,sizeof(Inode),1,file[fd].inodeOffset);
+	diskRead(&inode,sizeof(Inode),1,file[fd].inodeOffset);
 	switch(whence){
 		case SEEK_SET:
 			target = tf->edx;
@@ -916,15 +933,18 @@ void syscallRemove(struct TrapFrame *tf) {
 	char fatherPath[NAME_LENGTH<<3];
 	char filename[NAME_LENGTH];
 	char filePath[NAME_LENGTH*9];
-
+	char ch;
 	asm volatile("movw %0, %%es"::"m"(sel));
-	for(;i<NAME_LENGTH*9-1;++i){
-		asm volatile("movb %%es:(%1), %0":"=r"(filePath+i):"r"(str + i));
-		if(filePath[i]==0)
+	for(i=0;i<NAME_LENGTH*9-1;++i){
+		asm volatile("movb %%es:(%1), %0":"=r"(ch):"r"(str + i));
+		filePath[i] = ch;
+		if(ch==0)
 			break;
 	}
 	filePath[i] = 0;
-
+	putString("remove filepath:");
+	putString(filePath);
+	putChar('\n');
 	readSuperBlock(&sBlock);
 	ret = readInode(&sBlock,&destInode,&destInodeOffset,filePath);
 
@@ -950,9 +970,11 @@ void syscallRemove(struct TrapFrame *tf) {
 	if(filePath[length-1]=='/'){
 		--length;
 	}
-	stringCpy(filePath,fatherPath,length);
-	stringChrR(fatherPath,'/',&size);
-	stringCpy(filePath+size+1,filename,length-size-1);
+	
+	stringChrR(filePath,'/',&size);
+	size++;
+	stringCpy(filePath,fatherPath,size);
+	stringCpy(filePath+size,filename,length-size);
 	ret = readInode(&sBlock, &fatherInode, &fatherInodeOffset, fatherPath);
 	if(ret == -1){
 		tf->eax = -1;
@@ -973,7 +995,7 @@ int removeFile(Inode *fatherInode,int *fatherInodeOffset,Inode *destInode,int *d
 	DirEntry *dirEntry;
 	readSuperBlock(&sBlock);
 	if(destInode->type!=DIRECTORY_TYPE){
-		return freeInode(&sBlock,fatherInode,*fatherInodeOffset,destInode,*destInodeOffset,filename,destInode->type);
+		return freeInode(&sBlock,fatherInode,*fatherInodeOffset,destInode,destInodeOffset,filename,destInode->type);
 	}
 	for(i=0;i<destInode->blockCount;++i){
 		ret = readBlock(&sBlock,destInode,i,buffer);
@@ -984,7 +1006,7 @@ int removeFile(Inode *fatherInode,int *fatherInodeOffset,Inode *destInode,int *d
 			if(dirEntry[j].inode>0){
 				nextInodeOffset = dirEntry[j].inode;
 				diskRead(&nextInode,sizeof(Inode),1,nextInodeOffset);
-				ret = removeFile(destInode,destInodeOffset,&nextInode,&nextInodeOffset);
+				ret = removeFile(destInode,destInodeOffset,&nextInode,&nextInodeOffset,dirEntry[j].name);
 				if(ret == -1){
 					return -1;
 				}
@@ -992,5 +1014,5 @@ int removeFile(Inode *fatherInode,int *fatherInodeOffset,Inode *destInode,int *d
 				
 		}
 	}
-	return freeInode(&sBlock,fatherInode,*fatherInodeOffset,destInode,*destInodeOffset,filename,destInode->type);
+	return freeInode(&sBlock,fatherInode,*fatherInodeOffset,destInode,destInodeOffset,filename,destInode->type);
 }

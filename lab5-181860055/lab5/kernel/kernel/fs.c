@@ -282,7 +282,6 @@ int allocInode (SuperBlock *superBlock, Inode *fatherInode, int fatherInodeOffse
     int i = 0;
     int j = 0;
     int ret = 0;
-    int blockOffset = 0;
     DirEntry *dirEntry = NULL;
     uint8_t buffer[superBlock->blockSize];
     int length = stringLen(destFilename);

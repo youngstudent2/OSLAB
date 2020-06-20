@@ -12,7 +12,7 @@ void consume(int index){
 	printf("Consumer : consume\n");
 	sleep(sleepTime);
 }
-void deposit(sem_t* mutex, sem_t* fullBuffers, sem_t* emptyBuffers,int index)
+void _deposit(sem_t* mutex, sem_t* fullBuffers, sem_t* emptyBuffers,int index)
 {
 	//生产者
 	int i = 4;
@@ -34,7 +34,7 @@ void deposit(sem_t* mutex, sem_t* fullBuffers, sem_t* emptyBuffers,int index)
 		//sleep(sleepTime);
 	}
 }
-void remove(sem_t* mutex, sem_t* fullBuffers, sem_t* emptyBuffers,int index)
+void _remove(sem_t* mutex, sem_t* fullBuffers, sem_t* emptyBuffers,int index)
 {
 	int i = 8;
 	while (i-- > 0)
@@ -72,7 +72,7 @@ int main(void) {
 		
 		if(ret == 0){
 			//printf("fork producer %d\n",producer);
-			deposit(&mutex,&fullBuffers,&emptyBuffers,producer);
+			_deposit(&mutex,&fullBuffers,&emptyBuffers,producer);
 			exit();
 		}		
 	}
@@ -81,7 +81,7 @@ int main(void) {
 		
 		if(ret == 0){
 			//printf("fork consumer %d\n",consumer);
-			remove(&mutex,&fullBuffers,&emptyBuffers,consumer);
+			_remove(&mutex,&fullBuffers,&emptyBuffers,consumer);
 			exit();
 		}	
 	}

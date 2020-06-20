@@ -734,21 +734,23 @@ int getpid()
 	return syscall(SYS_GETPID, 0, 0, 0, 0, 0);
 }
 
-int open(const char* filename, uint8_t mode){
-	return syscall(SYS_OPEN,filename,mode,0,0,0);
+int open(const char* filename, uint32_t mode){
+	return syscall(SYS_OPEN,(uint32_t)filename,mode,0,0,0);
 }	
 
-int lseek(int fd, uint32_t offset, uint8_t origin){
-	return syscall(SYS_LSEEK,fd,offset,origin,0,0,0);
+int lseek(int fd, uint32_t offset, uint32_t origin){
+	return syscall(SYS_LSEEK,fd,offset,origin,0,0);
 }
 
 int remove(const char *filename){
-	return syscall(SYS_REMOVE,filename,0,0,0,0);
+	return syscall(SYS_REMOVE,(uint32_t)filename,0,0,0,0);
 }
 
 int close(int fd){
 	return syscall(SYS_CLOSE,fd,0,0,0,0);
 }
+
+
 
 void srand(int seed)
 {

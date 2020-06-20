@@ -348,7 +348,6 @@ int allocInode (FILE *file, SuperBlock *superBlock, Inode *fatherInode, int fath
     int i = 0;
     int j = 0;
     int ret = 0;
-    int blockOffset = 0;
     DirEntry *dirEntry = NULL;
     uint8_t buffer[superBlock->blockSize];
     int length = stringLen(destFilename);
@@ -538,7 +537,6 @@ int freeInode (FILE *file, SuperBlock *superBlock, Inode *fatherInode, int fathe
     int i = 0;
     int j = 0;
     int ret = 0;
-    int blockOffset = 0;
     DirEntry *dirEntry = NULL;
     uint8_t buffer[superBlock->blockSize];
     int length = stringLen(destFilename);

@@ -66,7 +66,7 @@ struct Device {
 };
 typedef struct Device Device;
 
-#define MAX_FIL_NUM 4
+#define MAX_FILE_NUM 4
 struct File{
 	int state;
 	int inodeOffset;	//XXX inodeOffset in filesystem, for syscall open

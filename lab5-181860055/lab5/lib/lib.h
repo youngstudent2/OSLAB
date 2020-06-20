@@ -62,14 +62,17 @@ int sem_destroy(sem_t *sem);
 
 int getpid();
 
-int open(const char* filename, uint8_t mode);
+int open(const char* filename, uint32_t mode);
 
-int lseek(int fd, uint32_t offset, uint8_t origin);
+int lseek(int fd, uint32_t offset, uint32_t origin);
 
 int remove(const char *filename);
 
 int close(int fd);
 
+int ls(const char * path);
+
+int cat(const char * filename);
 // add rand method
 int index;
 int MT[624]; 
