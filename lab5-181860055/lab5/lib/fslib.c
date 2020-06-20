@@ -33,12 +33,12 @@ int ls(const char *path){
         dirEntry = (DirEntry*)buffer;
         if(dirEntry->inode != 0){
             printf("%s ",dirEntry->name);
-
         }
 
     }
+    printf("\n");
     ret = close(fd);
-    printf("\nls success\n");
+    printf("ls success\n");
     return 0;
 }
 
